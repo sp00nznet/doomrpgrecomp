@@ -141,16 +141,29 @@ static void build_bar(void)
                 ImGui::SetNextItemWidth(90);
                 ImGui::InputInt("Godmode HP target", &g_cheat_health_target);
                 ImGui::Separator();
-                ImGui::Text("HP %d   Armor %d   Ammo pools %d / %d",
-                            cheats_get_health(), cheats_get_armor(),
-                            cheats_get_ammo(), cheats_get_ammo_max());
-                static int give_hp = 100, give_ar = 100, give_am = 99;
+
+                ImGui::Text("HP %d   Armor %d   Credits %d",
+                            cheats_get_health(), cheats_get_armor(), cheats_get_credits());
+                char ammo[64] = "Ammo:"; int n = cheats_ammo_count();
+                for (int i = 0; i < n; i++) {
+                    char tmp[12]; snprintf(tmp, sizeof tmp, " %d", cheats_ammo_get(i));
+                    strncat(ammo, tmp, sizeof ammo - strlen(ammo) - 1);
+                }
+                ImGui::TextDisabled("%s", n ? ammo : "Ammo: (not in game)");
+                ImGui::Separator();
+
+                static int give_hp = 100, give_ar = 100, give_cr = 1000;
                 ImGui::SetNextItemWidth(80); ImGui::InputInt("##hp", &give_hp);
-                ImGui::SameLine(); if (ImGui::Button("Give HP"))    cheats_set_health(give_hp);
+                ImGui::SameLine(); if (ImGui::Button("Give HP"))      cheats_set_health(give_hp);
                 ImGui::SetNextItemWidth(80); ImGui::InputInt("##ar", &give_ar);
-                ImGui::SameLine(); if (ImGui::Button("Give Armor")) cheats_set_armor(give_ar);
-                ImGui::SetNextItemWidth(80); ImGui::InputInt("##am", &give_am);
-                ImGui::SameLine(); if (ImGui::Button("Give Ammo"))  cheats_set_ammo(give_am);
+                ImGui::SameLine(); if (ImGui::Button("Give Armor"))   cheats_set_armor(give_ar);
+                ImGui::SetNextItemWidth(80); ImGui::InputInt("##cr", &give_cr);
+                ImGui::SameLine(); if (ImGui::Button("Give Credits")) cheats_set_credits(give_cr);
+                ImGui::Separator();
+                if (ImGui::Button("Give all weapons")) cheats_give_all_weapons();
+                ImGui::SameLine();
+                if (ImGui::Button("Give all keys"))    cheats_give_all_keys();
+                if (ImGui::Button("Fill all ammo (99)")) cheats_set_all_ammo(99);
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Warp level")) {

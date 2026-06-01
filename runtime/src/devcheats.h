@@ -18,14 +18,18 @@ void cheats_per_frame(void);          /* enforce pinned cheats; call once per fr
 
 int  cheats_get_health(void);
 int  cheats_get_armor(void);
-int  cheats_get_ammo(void);
-int  cheats_get_ammo_max(void);
 int  cheats_get_state(void);
+int  cheats_get_credits(void);
+int  cheats_ammo_count(void);     /* number of ammo types (6) */
+int  cheats_ammo_get(int i);
 void cheats_current_level(char *out, int cap);
 
 void cheats_set_health(int v);
 void cheats_set_armor(int v);
-void cheats_set_ammo(int v);
+void cheats_set_credits(int v);
+void cheats_set_all_ammo(int v);
+void cheats_give_all_weapons(void);
+void cheats_give_all_keys(void);
 void cheats_set_state(int st);
 
 int         cheats_level_count(void);
