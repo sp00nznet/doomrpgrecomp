@@ -145,6 +145,12 @@ build\Release\DoomRPG.exe
 - **[N64Recomp](https://github.com/N64Recomp/N64Recomp)** — proved static recompilation of whole games is practical.
 - **gbarecomp / psxrecomp** — the sibling projects this one cribs its structure from.
 - **The JVM Spec, Ch. 4 & 6** — the `.class` format and the opcode table, free and exhaustive.
+- **[DoomRPG-RE](https://github.com/Erick194/DoomRPG-RE) by Erick194** — a clean C
+  reverse-engineering of Doom RPG. We used it purely as a *reference* to decode our
+  obfuscated symbols (the player-stat layout behind the cheat menu, the save-store
+  names) — **no code was copied** (it's GPL-3.0; this project is MIT). Cross-checking
+  its v0.2.1→v0.2.2 fixes against our output also confirmed our J2ME recomp doesn't
+  share its BREW-version bugs (e.g. `aiGoal_MOVE` is already correct here).
 - **id Software & Fountainhead** — for making a genuinely great little dungeon crawler out of 300KB of bytecode.
 
 ## Legal
