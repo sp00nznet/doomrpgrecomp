@@ -87,9 +87,9 @@ all fixed-point integer math (there's a `sintable.bin` in the JAR to prove it).
 
 | Component | Status |
 |---|---|
-| `.class` parser (const pool / fields / methods / code) | 🔨 in progress |
-| Bytecode → C translator | ⬜ not started |
-| J2ME runtime (lcdui / rms / media) | ⬜ not started |
+| `.class` parser (const pool / fields / methods / code) | ✅ all 26 classes |
+| Bytecode → C translator | ✅ 383/383 methods → C, **compiles clean** (MSVC) |
+| J2ME runtime (lcdui / rms / media) | 🔨 next: the hand-written bodies |
 | SDL2 display + input | ⬜ not started |
 | Windows MIDI playback | ⬜ not started |
 | Boots to EA splash | ⬜ |

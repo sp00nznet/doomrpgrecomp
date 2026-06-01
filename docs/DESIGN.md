@@ -74,12 +74,39 @@ generated/             translator output (one .c/.h per class)  [gitignored]
 - **GC**: start with a simple arena / conservative mark-sweep; J2ME heaps are
   tiny (the phone had ~1–2 MB). Correctness first, collector later.
 
+### Decided
+- **Saves**: `RecordStore`s persist as `<storename>.rms` files next to the exe.
+- **Window**: integer-scaled (nearest-neighbour) from the native 128×128, resizable.
+- **Opcodes actually used** (relevant hard ones): `tableswitch`×30, `lookupswitch`×7,
+  `invokeinterface`×16, `athrow`×10 + exception tables, `monitorenter/exit`,
+  `checkcast`×6, `multianewarray`×1. **No** `jsr`/`ret`/`wide`/`invokedynamic`.
+- **Threads/monitors**: the game uses a worker `Thread`; v1 runs cooperatively and
+  treats `monitorenter`/`monitorexit` as no-ops (revisit if it deadlocks).
+
 ## Status / next steps
 1. ✅ `.class` parser + opcode table, validated on all 26 classes.
-2. ⏭ Object layout + name mangling (`layout.py`).
-3. ⏭ Bytecode→C method translator (`translate.py`).
-4. ⏭ J2ME runtime: java.lang/io/util first (no I/O surprises), then lcdui on SDL2.
-5. ⏭ Boot the MIDlet → EA splash → main menu.
+2. ✅ Name mangling (`mangle.py`) + object layout (`layout.py`): offset-based
+   fields, storage-typed statics, per-class method tables + jclass metadata.
+3. ✅ Bytecode→C translator (`translate.py`): explicit stack-slot model with an
+   abstract-interpretation typing pass; all 383 methods translate and the full
+   generated tree **compiles clean under MSVC** (compile-only; no runtime yet).
+4. ⏭ J2ME runtime bodies: java.lang/io/util first (no I/O surprises), then
+   lcdui on SDL2. 129 runtime methods / 21 classes / 2 statics to implement
+   (the exact list falls out of `jrecomp translate`).
+5. ⏭ Link + boot the MIDlet → EA splash → main menu.
+
+### Translator implementation notes
+- Stack entries are single-tagged (`i/l/f/d/a`); long/double are one entry
+  (category 2). Vars: `st<idx>_<tag>` (stack), `loc<slot>_<tag>` (locals).
+- Labels emitted only at real jump targets (not fall-through) to keep C clean.
+- `dup`/`swap` family realized via a temp-snapshot block — correct even when
+  adjacent slots share a tag.
+- Virtual/interface dispatch = runtime `j_vfind(cls, name, desc)` search (simple
+  + correct; real vtables can come later if perf ever matters).
+- Exceptions: per-method `j_try` setjmp pad + a `_pc` cursor; handler table
+  scanned in order, `j_instanceof` match → `goto` handler, else `j_rethrow`.
+- Field access is offset-based via `J_x(obj, OFFEXPR)`; offsets are
+  `J2ME_BASE_<super> + N` so the runtime owns base-class layout.
 
 ## Bug ledger
 Empty for now. Every recomp earns its scars; this is where the
