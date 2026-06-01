@@ -110,8 +110,13 @@ generated/             translator output (one .c/.h per class)  [gitignored]
    `getGameAction` now maps device keys to MIDP action constants, and the screen
    is 128x150 so the engine's 128x128 view isn't clipped (see ledger). A scripted
    input harness (`DOOMRPG_KEYS="fire@17000,..."`) drives the menus headlessly.
-9. ⏭ Push past the briefing into the first level — exercise the BSP renderer and
-   the 3D dungeon view; verify movement/turning and the HUD strip below the view.
+9. ✅ Into the first level. Past the briefing the Mars approach cinematic plays,
+   then the textured first-person view renders with the HUD strip (health/armour/
+   ammo + Menu/Map soft labels) below it; the d-pad turns and walks. The BSP
+   renderer, texture mapping and sprite blitting all came up with no extra changes
+   once input + screen size were fixed — verified headlessly via `DOOMRPG_KEYS`.
+10. ⏭ Exercise gameplay depth: combat (firing, enemies), item/inventory use, the
+   automap, doors/level transitions, and save/restore via the `.rms` store.
 
 ### Runtime implementation notes
 - Dispatch: runtime singletons (Runtime/Display) and wrapper objects must carry a

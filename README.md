@@ -98,8 +98,9 @@ all fixed-point integer math (there's a `sintable.bin` in the JAR to prove it).
 | **Renders the intro** | ✅ copyright → JAMDAT → Fountainhead splashes |
 | **Boots to main menu** | ✅ sound prompt → Start Game / Options / Help / Exit |
 | **Menu input works** | ✅ d-pad/fire navigate; New Game → the Mars briefing |
-| In-game (3D dungeon) | 🔨 next: drive past the briefing into a level |
-| Playable | ⬜ |
+| **In-game (3D dungeon)** | ✅ briefing → approach cinematic → textured 3D view + HUD |
+| **Movement / turning** | ✅ d-pad turns and walks the first-person view |
+| Playable | 🔨 renders + moves; combat / items / maps still to exercise |
 
 See [`docs/`](docs/) for the running design notes and the bug ledger (every
 recomp accrues a glorious list of "found-and-fixed" war stories — ours starts
