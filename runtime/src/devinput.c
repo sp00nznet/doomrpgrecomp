@@ -2,6 +2,7 @@
  * devinput.c -- rebindable keyboard + Xbox-controller input (see devinput.h).
  */
 #include "devinput.h"
+#include "devkeypad.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -70,6 +71,26 @@ static void stick_set(int dir, int active) {
 
 /* ---- event handling ------------------------------------------------------- */
 int devinput_process_event(const SDL_Event *e, int kbd_blocked) {
+    /* On-screen keypad: Back/Select toggles it; while open it owns the pad so
+     * the player can dial in door codes the controller otherwise can't type. */
+    if (e->type == SDL_CONTROLLERBUTTONDOWN &&
+        e->cbutton.button == SDL_CONTROLLER_BUTTON_BACK) { devkeypad_toggle(); return 1; }
+    if (devkeypad_is_open()) {
+        if (e->type == SDL_CONTROLLERBUTTONDOWN) {
+            switch (e->cbutton.button) {
+                case SDL_CONTROLLER_BUTTON_DPAD_UP:    devkeypad_move(0, -1); break;
+                case SDL_CONTROLLER_BUTTON_DPAD_DOWN:  devkeypad_move(0,  1); break;
+                case SDL_CONTROLLER_BUTTON_DPAD_LEFT:  devkeypad_move(-1, 0); break;
+                case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: devkeypad_move( 1, 0); break;
+                case SDL_CONTROLLER_BUTTON_A:          devkeypad_press();     break;
+                case SDL_CONTROLLER_BUTTON_B:          devkeypad_close();     break;
+                default: break;
+            }
+            return 1;                       /* swallow the pad while the keypad is up */
+        }
+        if (e->type == SDL_CONTROLLERBUTTONUP || e->type == SDL_CONTROLLERAXISMOTION) return 1;
+    }
+
     switch (e->type) {
     case SDL_CONTROLLERDEVICEADDED:
         if (!g_pad) g_pad = SDL_GameControllerOpen(e->cdevice.which);

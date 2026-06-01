@@ -14,6 +14,7 @@
 #include "devsaves.h"
 #include "devaudio.h"
 #include "devinput.h"
+#include "devkeypad.h"
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
@@ -248,6 +249,10 @@ static void build_bar(void)
         /* ---- Controls: keyboard + Xbox controller, rebindable ------------ */
         if (ImGui::BeginMenu("Controls")) {
             ImGui::Text("Controller: %s", devinput_controller_name());
+            bool kp = devkeypad_is_open();
+            if (ImGui::MenuItem("On-screen keypad", "Back btn", &kp)) devkeypad_toggle();
+            ImGui::TextDisabled("for door/puzzle codes (any digit)");
+            ImGui::Separator();
             int rb = devinput_rebinding_action();
             if (rb >= 0)
                 ImGui::TextColored(ImVec4(1, 0.85f, 0.2f, 1), "Press a %s for \"%s\" (Esc cancels)",
@@ -285,6 +290,25 @@ static void build_bar(void)
     }
 
     if (g_show_demo) ImGui::ShowDemoWindow(&g_show_demo);
+
+    /* On-screen numeric keypad for door/puzzle codes (controller or mouse). */
+    if (devkeypad_is_open()) {
+        ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, g_bar_h + 8.0f),
+                                ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+        ImGui::Begin("Keypad", nullptr,
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
+        for (int i = 0; i < devkeypad_count(); i++) {
+            if (i % 3) ImGui::SameLine();
+            bool hl = devkeypad_cursor() == i;
+            if (hl) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.45f, 0.1f, 1));
+            ImGui::PushID(i);
+            if (ImGui::Button(devkeypad_label(i), ImVec2(46, 46))) devkeypad_press_index(i);
+            ImGui::PopID();
+            if (hl) ImGui::PopStyleColor();
+        }
+        ImGui::TextDisabled("D-pad move / A enter / B or Back close");
+        ImGui::End();
+    }
 }
 
 void devgui_present(SDL_Texture *game_tex)
