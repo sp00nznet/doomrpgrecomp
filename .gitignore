@@ -33,6 +33,8 @@ game/extracted/
 *.map
 *.png
 # (the runtime ships no art; assets are loaded from the user's JAR at build/runtime)
+# ...except the README screenshot of our own running build:
+!docs/screenshot.png
 
 # Generated C is reproducible from the JAR -- regenerate with the recompiler
 generated/*.c

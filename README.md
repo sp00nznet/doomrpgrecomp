@@ -25,6 +25,11 @@
 > The recompiled C **is** the game. There is no VM underneath. It's demons all
 > the way down.
 
+![Doom RPG running natively, with the built-in dev/cheat menu docked on top](docs/screenshot.png)
+
+> *The recompiled game booted to its main menu, with our Dear ImGui dev bar
+> (File · Debug · Graphics · Audio · Controls) docked above the 128×128 view.*
+
 ---
 
 ## Wait, you can "recomp" a Java game?
@@ -83,7 +88,9 @@ all fixed-point integer math (there's a `sintable.bin` in the JAR to prove it).
 
 ## Status
 
-🚧 **Early days.** Building translator infrastructure first, then the runtime.
+**Playable.** It recompiles all 383 methods, boots from a cold start through the
+intro and menus into the textured 3D dungeon, and walks around — no JVM, no
+emulator. Combat and deeper systems are the current frontier.
 
 | Component | Status |
 |---|---|
@@ -125,20 +132,23 @@ here).
 
 ## Quick start
 
+Requires **Visual Studio 2022**, **Python 3**, and **SDL2 + Dear ImGui** via
+[vcpkg](https://github.com/microsoft/vcpkg) (`vcpkg install sdl2 imgui`).
+
 ```powershell
 # 0. Bring your own legally-obtained DoomRPG.jar
 copy path\to\DoomRPG.jar game\
 
-# 1. Recompile bytecode -> C
-python tools\recompiler\jrecomp.py game\DoomRPG.jar -o generated\
+# 1. Recompile bytecode -> C, build the native exe, stage assets + SDL2.dll
+.\build.ps1            # add -Run to launch it, -VcpkgRoot <path> if not C:\vcpkg
 
-# 2. Build the native exe (MSVC + SDL2 via vcpkg)
-cmake -B build -DCMAKE_TOOLCHAIN_FILE=<vcpkg>\scripts\buildsystems\vcpkg.cmake
-cmake --build build --config Release
-
-# 3. Raise hell
-build\Release\DoomRPG.exe
+# 2. Raise hell  (finds game\extracted automatically)
+build\DoomRPG.exe
 ```
+
+`build.ps1` extracts the JAR, runs the recompiler (`tools\recompiler\jrecomp.py`),
+generates the save-state registry, compiles the generated C + handwritten runtime
+with MSVC, and links one standalone `DoomRPG.exe`.
 
 ## Standing on the shoulders of giants
 
