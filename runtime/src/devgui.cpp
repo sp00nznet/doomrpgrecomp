@@ -12,6 +12,7 @@
 #include "devcheats.h"
 #include "savestate.h"
 #include "devaudio.h"
+#include "devinput.h"
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
@@ -183,7 +184,28 @@ static void build_bar(void)
 
         /* ---- Controls: keyboard + Xbox controller, rebindable ------------ */
         if (ImGui::BeginMenu("Controls")) {
-            ImGui::TextDisabled("keyboard + Xbox rebinding -- next pass");
+            ImGui::Text("Controller: %s", devinput_controller_name());
+            int rb = devinput_rebinding_action();
+            if (rb >= 0)
+                ImGui::TextColored(ImVec4(1, 0.85f, 0.2f, 1), "Press a %s for \"%s\" (Esc cancels)",
+                    devinput_rebinding_is_button() ? "button" : "key", devinput_action_name(rb));
+            ImGui::Separator();
+            ImGui::TextDisabled("%-14s %-14s %s", "Action", "Keyboard", "Controller");
+            for (int i = 0; i < devinput_action_count(); i++) {
+                ImGui::PushID(i);
+                ImGui::Text("%-14s", devinput_action_name(i));
+                ImGui::SameLine(150);
+                ImGui::PushID("k");
+                if (ImGui::SmallButton(devinput_key_label(i))) devinput_rebind_key(i);
+                ImGui::PopID();
+                ImGui::SameLine(280);
+                ImGui::PushID("b");
+                if (ImGui::SmallButton(devinput_button_label(i))) devinput_rebind_button(i);
+                ImGui::PopID();
+                ImGui::PopID();
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Reset to defaults")) devinput_reset_defaults();
             ImGui::EndMenu();
         }
 

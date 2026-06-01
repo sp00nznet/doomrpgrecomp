@@ -7,6 +7,7 @@
  */
 #include "j2me/runtime.h"
 #include "devgui.h"
+#include "devinput.h"
 #include <SDL.h>
 #include <stdio.h>
 
@@ -41,29 +42,13 @@ int display_init(int w, int h, int scale) {
     g_tex = SDL_CreateTexture(g_ren, SDL_PIXELFORMAT_ARGB8888,
         SDL_TEXTUREACCESS_STREAMING, w, h);
     devgui_init(g_win, g_ren, w, h, scale);
+    devinput_init();
     return 0;
 }
 
 void display_present(const uint32_t *argb) {
     SDL_UpdateTexture(g_tex, NULL, argb, g_w * (int)sizeof(uint32_t));
     devgui_present(g_tex);                    /* dev bar + game viewport + present */
-}
-
-static int map_key(SDL_Keycode k, int *gameaction_bit) {
-    *gameaction_bit = 0;
-    switch (k) {
-        case SDLK_UP:    *gameaction_bit = 1 << 1; return KEY_UP;
-        case SDLK_DOWN:  *gameaction_bit = 1 << 6; return KEY_DOWN;
-        case SDLK_LEFT:  *gameaction_bit = 1 << 2; return KEY_LEFT;
-        case SDLK_RIGHT: *gameaction_bit = 1 << 5; return KEY_RIGHT;
-        case SDLK_RETURN: case SDLK_SPACE: case SDLK_LCTRL:
-                         *gameaction_bit = 1 << 8; return KEY_FIRE;
-        case SDLK_q:     return KEY_SOFT1;
-        case SDLK_w:     return KEY_SOFT2;
-        default:
-            if (k >= SDLK_0 && k <= SDLK_9) return '0' + (k - SDLK_0);
-            return 0;
-    }
 }
 
 static void dispatch_key(const char *method, int keycode) {
@@ -73,17 +58,21 @@ static void dispatch_key(const char *method, int keycode) {
     if (fn) fn(g_canvas, keycode);
 }
 
-/* Shared press/release logic so both real SDL events and the scripted-input
- * harness (DOOMRPG_KEYS) go through the exact same code path. */
-static void key_down(SDL_Keycode sym) {
-    int ga = 0, kc = map_key(sym, &ga);
-    g_keystate |= ga; g_lastkey = kc;
-    dispatch_key("keyPressed", kc);
+/* Deliver a resolved game key (device code + getKeyStates bit). devinput.c
+ * calls this once a real keyboard/controller event matches a binding. */
+void display_dispatch(int keycode, int gabit, int down) {
+    if (down) { g_keystate |= gabit; g_lastkey = keycode; dispatch_key("keyPressed", keycode); }
+    else      { g_keystate &= ~gabit; dispatch_key("keyReleased", keycode); }
 }
-static void key_up(SDL_Keycode sym) {
-    int ga = 0, kc = map_key(sym, &ga);
-    g_keystate &= ~ga;
-    dispatch_key("keyReleased", kc);
+
+/* Scripted harness synthesizes real SDL key events so they flow through the
+ * same devinput path (and honour rebindings) as a player's keyboard. */
+static void push_key(SDL_Keycode sym, int down) {
+    SDL_Event e; SDL_zero(e);
+    e.type = down ? SDL_KEYDOWN : SDL_KEYUP;
+    e.key.keysym.sym = sym;
+    e.key.repeat = 0;
+    SDL_PushEvent(&e);
 }
 
 /* ---- scripted input: DOOMRPG_KEYS="fire@6000,down@7000,fire@8000,..." -------
@@ -130,10 +119,10 @@ static void pump_script(void) {
     Uint32 now = SDL_GetTicks();
     for (int i = 0; i < g_script_n; i++) {
         if (!g_script[i].down_done && now >= g_script[i].t) {
-            key_down(g_script[i].sym); g_script[i].down_done = 1;
+            push_key(g_script[i].sym, 1); g_script[i].down_done = 1;
         }
         if (g_script[i].down_done && !g_script[i].up_done && now >= g_script[i].t + 120) {
-            key_up(g_script[i].sym); g_script[i].up_done = 1;
+            push_key(g_script[i].sym, 0); g_script[i].up_done = 1;
         }
     }
 }
@@ -142,14 +131,10 @@ void display_pump(void) {
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         devgui_process_event(&e);             /* ImGui sees every event first */
-        if (e.type == SDL_QUIT) g_quit = 1;
-        /* Keyboard goes to the game unless ImGui is using it (e.g. text field). */
-        else if (e.type == SDL_KEYDOWN && !e.key.repeat && !devgui_capture_keyboard()) {
-            if (e.key.keysym.sym == SDLK_ESCAPE) { g_quit = 1; continue; }
-            key_down(e.key.keysym.sym);
-        } else if (e.type == SDL_KEYUP && !devgui_capture_keyboard()) {
-            key_up(e.key.keysym.sym);
-        }
+        if (e.type == SDL_QUIT) { g_quit = 1; continue; }
+        if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) { g_quit = 1; continue; }
+        /* real keyboard + controller input -> rebindable bindings (devinput) */
+        devinput_process_event(&e, devgui_capture_keyboard());
     }
     pump_script();
 }
@@ -157,4 +142,4 @@ void display_pump(void) {
 int  display_should_quit(void) { return g_quit; }
 int  display_key_state(void)   { return g_keystate; }
 int  display_last_keycode(void){ return g_lastkey; }
-void display_shutdown(void)    { devgui_shutdown(); if (g_win) SDL_DestroyWindow(g_win); SDL_Quit(); }
+void display_shutdown(void)    { devinput_shutdown(); devgui_shutdown(); if (g_win) SDL_DestroyWindow(g_win); SDL_Quit(); }
