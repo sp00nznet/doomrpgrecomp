@@ -105,9 +105,13 @@ generated/             translator output (one .c/.h per class)  [gitignored]
    Debug aids: `DOOMRPG_DUMP=path.ppm` dumps the framebuffer each flush;
    `DOOMRPG_DUMPDIR=dir` dumps a numbered boot sequence (stride `DOOMRPG_DUMPN`,
    cap `DOOMRPG_DUMPMAX`) — invaluable for catching the menu without a key in hand.
-8. ⏭ Verify keyboard input advances the menus (sound prompt → main menu →
-   new/continue game) and that the first level renders. The intro is gated only by
-   a 4 s/frame timer + the `S_k__p__Z` skip-key, so the worker loop is healthy.
+8. ✅ Keyboard input drives the menus: sound prompt → main menu (Start Game /
+   Options / Help / Exit) → New Game → the Mars briefing crawl. Two fixes landed:
+   `getGameAction` now maps device keys to MIDP action constants, and the screen
+   is 128x150 so the engine's 128x128 view isn't clipped (see ledger). A scripted
+   input harness (`DOOMRPG_KEYS="fire@17000,..."`) drives the menus headlessly.
+9. ⏭ Push past the briefing into the first level — exercise the BSP renderer and
+   the 3D dungeon view; verify movement/turning and the HUD strip below the view.
 
 ### Runtime implementation notes
 - Dispatch: runtime singletons (Runtime/Display) and wrapper objects must carry a
@@ -146,3 +150,20 @@ accumulate (translator mistakes caught by diffing against a reference JVM run, e
   `blit_xform()` now also applies the 8 Sprite transforms (the swap of on-screen
   w/h for the rot90/270 family feeds the anchor maths). `lcdui.c`.
   *Symptom that pointed here: intro logos in the corner, DOOM RPG title clipped.*
+
+- **Every menu keypress was a no-op.** `Canvas.getGameAction()` returned the raw
+  key code unchanged ("the display layer already reports game actions" — it does
+  not). The game's `k.a(I)I` calls `getGameAction()` and switches on the *MIDP*
+  action constants (UP=1/DOWN=6/LEFT=2/RIGHT=5/FIRE=8), so every direction/fire
+  fell through to "no action" and the menus never moved. Fix: map our device key
+  codes (display.c's `KEY_UP=-1…KEY_FIRE=-5`) to those constants. `lcdui.c`.
+  *Found by scripting a fire at the sound prompt and seeing nothing happen.*
+
+- **Top ~11px of every screen clipped.** We modelled the Canvas as 128x128, but
+  the engine renders a 128x128 view and reserves a HUD strip *below* it, deriving
+  the view height as `canvasHeight-22`. With a 128 canvas the view became 106 tall
+  and its centre `S_k.i = e/2 = 53`; the briefing/3D code then centres 128x128
+  boxes on that centre (`y = centre-64 = -11`), so the top 11px fell off-screen.
+  The real full-screen device is **128x150** (150-22 = the 128 view the engine
+  hardcodes). Fix: `SCREEN_H = 150` (`runtime.h`); the splash/menu/briefing now
+  sit correctly with the HUD strip below. *Symptom: "top of the screen cut off".*

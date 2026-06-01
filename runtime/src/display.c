@@ -71,21 +71,83 @@ static void dispatch_key(const char *method, int keycode) {
     if (fn) fn(g_canvas, keycode);
 }
 
+/* Shared press/release logic so both real SDL events and the scripted-input
+ * harness (DOOMRPG_KEYS) go through the exact same code path. */
+static void key_down(SDL_Keycode sym) {
+    int ga = 0, kc = map_key(sym, &ga);
+    g_keystate |= ga; g_lastkey = kc;
+    dispatch_key("keyPressed", kc);
+}
+static void key_up(SDL_Keycode sym) {
+    int ga = 0, kc = map_key(sym, &ga);
+    g_keystate &= ~ga;
+    dispatch_key("keyReleased", kc);
+}
+
+/* ---- scripted input: DOOMRPG_KEYS="fire@6000,down@7000,fire@8000,..." -------
+ * Each token is <name>@<ms> where ms is wall time from startup. The key is
+ * pressed at that time and released ~120ms later. Useful for driving the menus
+ * without a focused window (CI / headless verification). */
+#define MAX_SCRIPT 64
+static struct { SDL_Keycode sym; Uint32 t; int down_done, up_done; } g_script[MAX_SCRIPT];
+static int  g_script_n = -1;     /* -1 = not yet parsed */
+
+static SDL_Keycode name_to_sym(const char *s, int len) {
+    if (!strncmp(s, "up", len) && len == 2)    return SDLK_UP;
+    if (!strncmp(s, "down", len) && len == 4)  return SDLK_DOWN;
+    if (!strncmp(s, "left", len) && len == 4)  return SDLK_LEFT;
+    if (!strncmp(s, "right", len) && len == 5) return SDLK_RIGHT;
+    if (!strncmp(s, "fire", len) && len == 4)  return SDLK_RETURN;
+    if (!strncmp(s, "soft1", len) && len == 5) return SDLK_q;
+    if (!strncmp(s, "soft2", len) && len == 5) return SDLK_w;
+    if (len == 1 && s[0] >= '0' && s[0] <= '9') return SDLK_0 + (s[0] - '0');
+    return 0;
+}
+static void parse_script(void) {
+    g_script_n = 0;
+    const char *env = getenv("DOOMRPG_KEYS");
+    if (!env) return;
+    const char *p = env;
+    while (*p && g_script_n < MAX_SCRIPT) {
+        const char *at = p;
+        while (*at && *at != '@' && *at != ',') at++;
+        if (*at != '@') break;
+        SDL_Keycode sym = name_to_sym(p, (int)(at - p));
+        Uint32 t = (Uint32)atoi(at + 1);
+        if (sym) { g_script[g_script_n].sym = sym; g_script[g_script_n].t = t;
+                   g_script[g_script_n].down_done = g_script[g_script_n].up_done = 0;
+                   g_script_n++; }
+        const char *comma = at;
+        while (*comma && *comma != ',') comma++;
+        if (*comma == ',') p = comma + 1; else break;
+    }
+}
+static void pump_script(void) {
+    if (g_script_n < 0) parse_script();
+    if (g_script_n == 0) return;
+    Uint32 now = SDL_GetTicks();
+    for (int i = 0; i < g_script_n; i++) {
+        if (!g_script[i].down_done && now >= g_script[i].t) {
+            key_down(g_script[i].sym); g_script[i].down_done = 1;
+        }
+        if (g_script[i].down_done && !g_script[i].up_done && now >= g_script[i].t + 120) {
+            key_up(g_script[i].sym); g_script[i].up_done = 1;
+        }
+    }
+}
+
 void display_pump(void) {
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) g_quit = 1;
         else if (e.type == SDL_KEYDOWN && !e.key.repeat) {
-            int ga = 0, kc = map_key(e.key.keysym.sym, &ga);
             if (e.key.keysym.sym == SDLK_ESCAPE) { g_quit = 1; continue; }
-            g_keystate |= ga; g_lastkey = kc;
-            dispatch_key("keyPressed", kc);
+            key_down(e.key.keysym.sym);
         } else if (e.type == SDL_KEYUP) {
-            int ga = 0, kc = map_key(e.key.keysym.sym, &ga);
-            g_keystate &= ~ga;
-            dispatch_key("keyReleased", kc);
+            key_up(e.key.keysym.sym);
         }
     }
+    pump_script();
 }
 
 int  display_should_quit(void) { return g_quit; }

@@ -164,10 +164,20 @@ jref m_javax_microedition_lcdui_Image__createImage__Ljava_lang_String__Ljavax_mi
 void m_javax_microedition_lcdui_Canvas__setFullScreenMode__Z__V(jref this_, jint full) {
     (void)this_; (void)full;
 }
-/* map device key codes to MIDP game actions (UP/DOWN/LEFT/RIGHT/FIRE = 1..5,
- * matching Canvas constants used by the game) */
+/* Map the device key codes our display layer emits (see display.c) to the
+ * standard MIDP Canvas game-action constants. The game's getGameAction()
+ * consumers (e.g. k.a(I)I) compare against UP=1/DOWN=6/LEFT=2/RIGHT=5/FIRE=8,
+ * so returning the raw key here would make every menu input a no-op. */
 jint m_javax_microedition_lcdui_Canvas__getGameAction__I__I(jref this_, jint key) {
-    (void)this_; return key;   /* our display layer already reports game actions */
+    (void)this_;
+    switch (key) {
+        case -1: return 1;   /* KEY_UP    -> Canvas.UP    */
+        case -2: return 6;   /* KEY_DOWN  -> Canvas.DOWN  */
+        case -3: return 2;   /* KEY_LEFT  -> Canvas.LEFT  */
+        case -4: return 5;   /* KEY_RIGHT -> Canvas.RIGHT */
+        case -5: return 8;   /* KEY_FIRE  -> Canvas.FIRE  */
+        default: return 0;   /* digits / soft keys: no game action */
+    }
 }
 
 /* ===== GameCanvas ========================================================== */

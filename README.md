@@ -96,7 +96,9 @@ all fixed-point integer math (there's a `sintable.bin` in the JAR to prove it).
 | **Launches + runs the game loop** | ✅ boots, no crashes, loop alive |
 | PNG decode (own inflate, no zlib) | ✅ verified pixel-exact vs reference |
 | **Renders the intro** | ✅ copyright → JAMDAT → Fountainhead splashes |
-| **Boots to main menu** | ✅ reaches the "Enable sounds?" prompt, logo placed |
+| **Boots to main menu** | ✅ sound prompt → Start Game / Options / Help / Exit |
+| **Menu input works** | ✅ d-pad/fire navigate; New Game → the Mars briefing |
+| In-game (3D dungeon) | 🔨 next: drive past the briefing into a level |
 | Playable | ⬜ |
 
 See [`docs/`](docs/) for the running design notes and the bug ledger (every

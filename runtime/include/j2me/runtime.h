@@ -157,9 +157,13 @@ int    display_last_keycode(void);
 void   display_shutdown(void);
 void   display_set_canvas(jref canvas);    /* current Canvas; receives key events */
 
-/* native game screen size (the phone's screen) */
+/* Native game screen size (the phone's full-screen Canvas). The game renders a
+ * 128x128 first-person/menu view and reserves a ~22px HUD strip below it: it
+ * derives the view height as canvasHeight-22, so a 150px-tall canvas yields the
+ * 128px view the engine hardcodes (it centers 128x128 boxes on the view centre,
+ * so a shorter canvas clips the top). 128 wide matches every shipped asset. */
 #define SCREEN_W 128
-#define SCREEN_H 128
+#define SCREEN_H 150
 
 /* ---- audio (winmm MIDI) ---------------------------------------------------- */
 void   midi_init(void);
