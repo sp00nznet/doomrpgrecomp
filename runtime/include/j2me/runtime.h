@@ -145,6 +145,7 @@ uint32_t *png_decode(const uint8_t *data, int len, int *w, int *h);  /* ARGB, ma
 
 /* ---- assets (resources packed in the JAR) --------------------------------- */
 int    assets_open(const char *jar_or_dir);
+int    assets_probe(const char *dir);                 /* 1 if dir holds extracted assets */
 uint8_t *assets_get(const char *name, int *out_len);  /* borrowed bytes, or NULL */
 
 /* ---- display / input (SDL2) ----------------------------------------------- */

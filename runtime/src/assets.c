@@ -20,6 +20,17 @@ int assets_open(const char *dir) {
     return 0;
 }
 
+/* Does `dir` look like an extracted DoomRPG.jar? (checks for a known entry) */
+int assets_probe(const char *dir) {
+    if (!dir || !*dir) return 0;
+    char path[1100];
+    snprintf(path, sizeof path, "%s/%s", dir, "intro.bsp");
+    FILE *f = fopen(path, "rb");
+    if (!f) return 0;
+    fclose(f);
+    return 1;
+}
+
 uint8_t *assets_get(const char *name, int *out_len) {
     for (struct cache *c = g_cache; c; c = c->next)
         if (strcmp(c->name, name) == 0) { if (out_len) *out_len = c->len; return c->data; }
