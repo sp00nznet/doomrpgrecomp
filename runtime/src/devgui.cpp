@@ -29,6 +29,12 @@ extern "C" {
 
 static bool g_show_demo = false;
 
+/* Controller menu navigation: when on, ImGui reads the pad for nav and the game
+ * is frozen out (devinput swallows the pad). Toggled by Start (see devinput.c). */
+static bool g_menu_nav = false;
+extern "C" void devgui_toggle_menu_nav(void) { g_menu_nav = !g_menu_nav; }
+extern "C" int  devgui_menu_nav(void)        { return g_menu_nav; }
+
 static SDL_Window   *g_win;
 static SDL_Renderer *g_ren;
 static int g_game_w, g_game_h, g_scale;
@@ -252,6 +258,9 @@ static void build_bar(void)
             bool kp = devkeypad_is_open();
             if (ImGui::MenuItem("On-screen keypad", "Back btn", &kp)) devkeypad_toggle();
             ImGui::TextDisabled("for door/puzzle codes (any digit)");
+            bool nav = devgui_menu_nav() != 0;
+            if (ImGui::MenuItem("Controller menu nav", "Start btn", &nav)) devgui_toggle_menu_nav();
+            ImGui::TextDisabled("drive this menu with the pad (game pauses)");
             ImGui::Separator();
             int rb = devinput_rebinding_action();
             if (rb >= 0)
@@ -278,8 +287,9 @@ static void build_bar(void)
         }
 
         /* right-aligned status readout */
-        char status[96];
-        snprintf(status, sizeof status, "HP %d  AR %d   state %d   %.0f fps",
+        char status[112];
+        snprintf(status, sizeof status, "%sHP %d  AR %d   state %d   %.0f fps",
+                 g_menu_nav ? "[PAD NAV] " : "",
                  cheats_get_health(), cheats_get_armor(),
                  cheats_get_state(), ImGui::GetIO().Framerate);
         float tw = ImGui::CalcTextSize(status).x;
@@ -317,6 +327,10 @@ void devgui_present(SDL_Texture *game_tex)
     g_in_present = 1;
     g_last_present = SDL_GetTicks();
     cheats_per_frame();                 /* enforce pinned cheats (godmode, etc.) */
+
+    ImGuiIO &io = ImGui::GetIO();        /* toggle gamepad nav for this frame */
+    if (g_menu_nav) io.ConfigFlags |=  ImGuiConfigFlags_NavEnableGamepad;
+    else            io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
 
     ImGui_ImplSDLRenderer2_NewFrame();
     ImGui_ImplSDL2_NewFrame();

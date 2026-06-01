@@ -8,6 +8,9 @@
 
 /* dispatch a game device key code (display.c owns the Canvas + key-state mask) */
 extern void display_dispatch(int keycode, int gabit, int down);
+/* controller menu-navigation toggle (devgui.cpp) */
+extern int  devgui_menu_nav(void);
+extern void devgui_toggle_menu_nav(void);
 
 /* MIDP-ish device key codes the game expects (mirrors display.c) */
 enum { KEY_UP = -1, KEY_DOWN = -2, KEY_LEFT = -3, KEY_RIGHT = -4,
@@ -71,6 +74,10 @@ static void stick_set(int dir, int active) {
 
 /* ---- event handling ------------------------------------------------------- */
 int devinput_process_event(const SDL_Event *e, int kbd_blocked) {
+    /* Start toggles controller menu-navigation (ImGui drives the menu, game off). */
+    if (e->type == SDL_CONTROLLERBUTTONDOWN &&
+        e->cbutton.button == SDL_CONTROLLER_BUTTON_START) { devgui_toggle_menu_nav(); return 1; }
+
     /* On-screen keypad: Back/Select toggles it; while open it owns the pad so
      * the player can dial in door codes the controller otherwise can't type. */
     if (e->type == SDL_CONTROLLERBUTTONDOWN &&
@@ -90,6 +97,12 @@ int devinput_process_event(const SDL_Event *e, int kbd_blocked) {
         }
         if (e->type == SDL_CONTROLLERBUTTONUP || e->type == SDL_CONTROLLERAXISMOTION) return 1;
     }
+
+    /* While menu-nav is active, ImGui reads the pad for navigation; keep it away
+     * from the game (device add/remove still pass through below). */
+    if (devgui_menu_nav() && (e->type == SDL_CONTROLLERBUTTONDOWN ||
+        e->type == SDL_CONTROLLERBUTTONUP || e->type == SDL_CONTROLLERAXISMOTION))
+        return 1;
 
     switch (e->type) {
     case SDL_CONTROLLERDEVICEADDED:
