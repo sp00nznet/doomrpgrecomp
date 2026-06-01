@@ -9,6 +9,7 @@
  * linked from vcpkg (imgui.lib).
  */
 #include "devgui.h"
+#include "devcheats.h"
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
@@ -16,17 +17,12 @@
 #include <stdlib.h>
 
 /* ---- the recompiled game's native state (C linkage; defined in generated/) ---
- * These are ordinary globals emitted by the translator, so we can read/write
- * them straight from here. jint is int32_t == int on MSVC/x64. */
+ * Ordinary globals emitted by the translator; jint is int32_t == int here. */
 extern "C" {
-    extern int S_k__w__I;   /* the game's state-machine value (8=main menu, 7=briefing, ...) */
     extern int S_k__f__Z;   /* the game's own debug overlay (ms/li/sp/nd counters) */
 }
 
-/* cheat toggles (enforcement wired in a later pass) */
-static bool g_godmode      = false;
-static bool g_infinite_ammo = false;
-static bool g_show_demo    = false;
+static bool g_show_demo = false;
 
 static SDL_Renderer *g_ren;
 static int g_game_w, g_game_h, g_scale;
@@ -42,7 +38,8 @@ void devgui_init(SDL_Window *win, SDL_Renderer *ren, int game_w, int game_h, int
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
     io.IniFilename = nullptr;                 /* don't litter an imgui.ini */
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    /* No keyboard nav: the game owns the keyboard (arrows/fire); the mouse
+     * drives the menu. Otherwise ImGui would eat fire/arrows for menu nav. */
     ImGui::StyleColorsDark();
     ImGui_ImplSDL2_InitForSDLRenderer(win, ren);
     ImGui_ImplSDLRenderer2_Init(ren);
@@ -63,19 +60,46 @@ static void build_bar(void)
         g_bar_h = (int)ImGui::GetWindowSize().y;   /* exact bar height for layout */
 
         if (ImGui::BeginMenu("Cheats")) {
-            ImGui::MenuItem("Godmode", "F2", &g_godmode);
-            ImGui::MenuItem("Infinite ammo", nullptr, &g_infinite_ammo);
+            bool god = g_cheat_godmode != 0;
+            if (ImGui::MenuItem("Godmode", nullptr, &god)) g_cheat_godmode = god;
+            bool inf = g_cheat_inf_ammo != 0;
+            if (ImGui::MenuItem("Infinite ammo", nullptr, &inf)) g_cheat_inf_ammo = inf;
+            ImGui::SetNextItemWidth(90);
+            ImGui::InputInt("Godmode HP target", &g_cheat_health_target);
             ImGui::Separator();
-            ImGui::TextDisabled("enforcement lands in the next pass");
+
+            ImGui::Text("HP %d   Armor %d   Ammo pools %d / %d",
+                        cheats_get_health(), cheats_get_armor(),
+                        cheats_get_ammo(), cheats_get_ammo_max());
+            static int give_hp = 100, give_ar = 100, give_am = 99;
+            ImGui::SetNextItemWidth(80); ImGui::InputInt("##hp", &give_hp);
+            ImGui::SameLine(); if (ImGui::Button("Give HP"))    cheats_set_health(give_hp);
+            ImGui::SetNextItemWidth(80); ImGui::InputInt("##ar", &give_ar);
+            ImGui::SameLine(); if (ImGui::Button("Give Armor")) cheats_set_armor(give_ar);
+            ImGui::SetNextItemWidth(80); ImGui::InputInt("##am", &give_am);
+            ImGui::SameLine(); if (ImGui::Button("Give Ammo"))  cheats_set_ammo(give_am);
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Warp")) {
+            char cur[64]; cheats_current_level(cur, sizeof cur);
+            ImGui::Text("Current: %s", cur[0] ? cur : "(none)");
+            ImGui::Separator();
+            for (int i = 0; i < cheats_level_count(); i++)
+                if (ImGui::MenuItem(cheats_level_name(i))) cheats_warp(i);
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("State")) {
-            ImGui::Text("Current state: %d", S_k__w__I);
+            ImGui::Text("Current state: %d", cheats_get_state());
             ImGui::Separator();
-            if (ImGui::MenuItem("State -")) S_k__w__I--;
-            if (ImGui::MenuItem("State +")) S_k__w__I++;
-            ImGui::TextDisabled("8=main menu  7=briefing");
-            ImGui::TextDisabled("(raw poke; level/state jumps come next)");
+            struct { const char *name; int st; } quick[] = {
+                {"Main menu (8)", 8}, {"Briefing (7)", 7}, {"In-game (1)", 1},
+                {"Automap (3)", 3}, {"Inventory (6)", 6},
+            };
+            for (auto &q : quick)
+                if (ImGui::MenuItem(q.name)) cheats_set_state(q.st);
+            ImGui::Separator();
+            if (ImGui::MenuItem("State -")) cheats_set_state(cheats_get_state() - 1);
+            if (ImGui::MenuItem("State +")) cheats_set_state(cheats_get_state() + 1);
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("View")) {
@@ -86,8 +110,10 @@ static void build_bar(void)
         }
 
         /* right-aligned status readout */
-        char status[64];
-        snprintf(status, sizeof status, "state %d   %.0f fps", S_k__w__I, ImGui::GetIO().Framerate);
+        char status[96];
+        snprintf(status, sizeof status, "HP %d  AR %d   state %d   %.0f fps",
+                 cheats_get_health(), cheats_get_armor(),
+                 cheats_get_state(), ImGui::GetIO().Framerate);
         float tw = ImGui::CalcTextSize(status).x;
         ImGui::SameLine(ImGui::GetWindowWidth() - tw - 12.0f);
         ImGui::TextDisabled("%s", status);
@@ -100,6 +126,8 @@ static void build_bar(void)
 
 void devgui_present(SDL_Texture *game_tex)
 {
+    cheats_per_frame();                 /* enforce pinned cheats (godmode, etc.) */
+
     ImGui_ImplSDLRenderer2_NewFrame();
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
@@ -118,10 +146,11 @@ void devgui_present(SDL_Texture *game_tex)
     /* Debug/screenshot: DOOMRPG_WINDUMP=path.ppm dumps the whole composited
      * window (dev bar + game) once, so the overlay can be verified headlessly. */
     const char *wd = getenv("DOOMRPG_WINDUMP");
-    const char *wn = getenv("DOOMRPG_WINDUMP_N");   /* present-frame index to grab (default 0) */
-    static long pf = 0; long target = wn ? atol(wn) : 0;
+    const char *wn = getenv("DOOMRPG_WINDUMP_N");   /* overwrite stride (default 60); 0 = once */
+    static long pf = 0; long stride = wn ? atol(wn) : 60;
     static bool dumped = false;
-    if (wd && !dumped && pf++ >= target) {
+    bool do_dump = wd && (stride == 0 ? !dumped : (pf++ % stride) == 0);
+    if (do_dump) {
         int ow = 0, oh = 0; SDL_GetRendererOutputSize(g_ren, &ow, &oh);
         unsigned char *px = (unsigned char *)malloc((size_t)ow * oh * 4);
         if (px && SDL_RenderReadPixels(g_ren, NULL, SDL_PIXELFORMAT_ARGB8888, px, ow * 4) == 0) {
