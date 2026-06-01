@@ -6,6 +6,7 @@
  * their ASCII codes); getGameAction() in lcdui.c maps them to UP/DOWN/.../FIRE.
  */
 #include "j2me/runtime.h"
+#include "devgui.h"
 #include <SDL.h>
 #include <stdio.h>
 
@@ -29,22 +30,23 @@ int display_init(int w, int h, int scale) {
         return -1;
     }
     g_w = w; g_h = h; g_scale = scale;
+    /* Window holds the thin dev menu bar on top + the scaled game viewport below. */
+    int win_w = w * scale;
+    if (win_w < 480) win_w = 480;            /* room for the menu-bar titles */
+    int win_h = devgui_bar_height() + h * scale;
     g_win = SDL_CreateWindow("Doom RPG (recomp)",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        w * scale, h * scale, SDL_WINDOW_RESIZABLE);
+        win_w, win_h, SDL_WINDOW_RESIZABLE);
     g_ren = SDL_CreateRenderer(g_win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    SDL_RenderSetLogicalSize(g_ren, w, h);   /* integer-ish scaling, keeps aspect */
-    SDL_RenderSetIntegerScale(g_ren, SDL_TRUE);
     g_tex = SDL_CreateTexture(g_ren, SDL_PIXELFORMAT_ARGB8888,
         SDL_TEXTUREACCESS_STREAMING, w, h);
+    devgui_init(g_win, g_ren, w, h, scale);
     return 0;
 }
 
 void display_present(const uint32_t *argb) {
     SDL_UpdateTexture(g_tex, NULL, argb, g_w * (int)sizeof(uint32_t));
-    SDL_RenderClear(g_ren);
-    SDL_RenderCopy(g_ren, g_tex, NULL, NULL);
-    SDL_RenderPresent(g_ren);
+    devgui_present(g_tex);                    /* dev bar + game viewport + present */
 }
 
 static int map_key(SDL_Keycode k, int *gameaction_bit) {
@@ -139,11 +141,13 @@ static void pump_script(void) {
 void display_pump(void) {
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
+        devgui_process_event(&e);             /* ImGui sees every event first */
         if (e.type == SDL_QUIT) g_quit = 1;
-        else if (e.type == SDL_KEYDOWN && !e.key.repeat) {
+        /* Keyboard goes to the game unless ImGui is using it (e.g. text field). */
+        else if (e.type == SDL_KEYDOWN && !e.key.repeat && !devgui_capture_keyboard()) {
             if (e.key.keysym.sym == SDLK_ESCAPE) { g_quit = 1; continue; }
             key_down(e.key.keysym.sym);
-        } else if (e.type == SDL_KEYUP) {
+        } else if (e.type == SDL_KEYUP && !devgui_capture_keyboard()) {
             key_up(e.key.keysym.sym);
         }
     }
@@ -153,4 +157,4 @@ void display_pump(void) {
 int  display_should_quit(void) { return g_quit; }
 int  display_key_state(void)   { return g_keystate; }
 int  display_last_keycode(void){ return g_lastkey; }
-void display_shutdown(void)    { if (g_win) SDL_DestroyWindow(g_win); SDL_Quit(); }
+void display_shutdown(void)    { devgui_shutdown(); if (g_win) SDL_DestroyWindow(g_win); SDL_Quit(); }

@@ -46,3 +46,6 @@ generated/*.h
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Runtime RecordStore saves the game writes next to the exe / cwd
+*.rms

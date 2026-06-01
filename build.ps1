@@ -12,6 +12,8 @@ Set-Location $root
 
 $vcvars = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
 $sdlInc = "$VcpkgRoot\installed\x64-windows\include\SDL2"
+$imguiInc = "$VcpkgRoot\installed\x64-windows\include"        # imgui.h
+$beInc = "runtime\third_party\imgui_backends"                  # vendored SDL2 backends
 $sdlLib = "$VcpkgRoot\installed\x64-windows\lib"
 $sdlDll = "$VcpkgRoot\installed\x64-windows\bin\SDL2.dll"
 
@@ -22,12 +24,18 @@ python tools\recompiler\jrecomp.py translate game\DoomRPG.jar -o generated\
 if ($LASTEXITCODE -ne 0) { throw "recompiler failed" }
 
 Write-Host "[2/4] Compiling C (generated + runtime) ..."
-$compile = "`"$vcvars`" >nul 2>&1 && cl /nologo /c /O2 /W3 /wd4102 /I runtime\include /I generated /I `"$sdlInc`" /Fobuild\obj\ generated\*.c runtime\src\*.c"
+# /MD on everything so the C objects match vcpkg's dynamic-CRT imgui.lib.
+$compile = "`"$vcvars`" >nul 2>&1 && cl /nologo /c /O2 /MD /W3 /wd4102 /I runtime\include /I generated /I `"$sdlInc`" /Fobuild\obj\ generated\*.c runtime\src\*.c"
 cmd /c $compile
 if ($LASTEXITCODE -ne 0) { throw "compile failed" }
 
+Write-Host "[2b/4] Compiling C++ (ImGui dev menu + backends) ..."
+$compilecpp = "`"$vcvars`" >nul 2>&1 && cl /nologo /c /O2 /MD /EHsc /W3 /I runtime\include /I generated /I `"$imguiInc`" /I `"$beInc`" /I `"$sdlInc`" /Fobuild\obj\ runtime\src\devgui.cpp $beInc\*.cpp"
+cmd /c $compilecpp
+if ($LASTEXITCODE -ne 0) { throw "C++ compile failed" }
+
 Write-Host "[3/4] Linking DoomRPG.exe ..."
-$link = "`"$vcvars`" >nul 2>&1 && link /nologo /SUBSYSTEM:CONSOLE /OUT:build\DoomRPG.exe build\obj\*.obj `"$sdlLib\SDL2.lib`" winmm.lib"
+$link = "`"$vcvars`" >nul 2>&1 && link /nologo /SUBSYSTEM:CONSOLE /OUT:build\DoomRPG.exe build\obj\*.obj `"$sdlLib\SDL2.lib`" `"$sdlLib\imgui.lib`" winmm.lib"
 cmd /c $link
 if ($LASTEXITCODE -ne 0) { throw "link failed" }
 
