@@ -99,9 +99,15 @@ generated/             translator output (one .c/.h per class)  [gitignored]
 6. ✅ PNG decode (`png.c`, hand-written DEFLATE inflate + filters, palette/RGB/
    gray, tRNS) — verified pixel-exact against a Python reference. The game now
    renders its intro splashes (copyright text, JAMDAT, Fountainhead).
-7. ⏭ Push through to the main menu; fill in `drawRegion` transforms (flip/rotate)
-   and `drawImage` anchors so sprites land correctly; verify input advances menus.
-   Debug aid: set `DOOMRPG_DUMP=path.ppm` to dump the framebuffer each flush.
+7. ✅ Main menu reached. `drawImage`/`drawRegion` now honour the MIDP anchor and
+   the 8 Sprite transforms (`lcdui.c`), so the intro splashes centre correctly and
+   the "Enable sounds?" boot prompt + DOOM RPG logo land where they should.
+   Debug aids: `DOOMRPG_DUMP=path.ppm` dumps the framebuffer each flush;
+   `DOOMRPG_DUMPDIR=dir` dumps a numbered boot sequence (stride `DOOMRPG_DUMPN`,
+   cap `DOOMRPG_DUMPMAX`) — invaluable for catching the menu without a key in hand.
+8. ⏭ Verify keyboard input advances the menus (sound prompt → main menu →
+   new/continue game) and that the first level renders. The intro is gated only by
+   a 4 s/frame timer + the `S_k__p__Z` skip-key, so the worker loop is healthy.
 
 ### Runtime implementation notes
 - Dispatch: runtime singletons (Runtime/Display) and wrapper objects must carry a
@@ -127,6 +133,16 @@ generated/             translator output (one .c/.h per class)  [gitignored]
   `J2ME_BASE_<super> + N` so the runtime owns base-class layout.
 
 ## Bug ledger
-Empty for now. Every recomp earns its scars; this is where the
-"found-and-fixed" war stories will accumulate (translator mistakes caught by
-diffing against a reference JVM run, etc.).
+Every recomp earns its scars; this is where the "found-and-fixed" war stories
+accumulate (translator mistakes caught by diffing against a reference JVM run, etc.).
+
+- **Splashes/logo drawn into the bottom-right; menu logo half off-screen.**
+  `Graphics.drawImage`/`drawRegion` ignored the MIDP `anchor` argument and always
+  drew top-left. The game routes its blits through a `k` helper that forwards the
+  anchor straight to `drawRegion` (`k.c:9671`); the intro passes `anchor=3`
+  (`HCENTER|VCENTER`) with the destination point at screen centre, so a 128×128
+  image got its *top-left* at (64,64) → visible only in the bottom-right quadrant.
+  Fix: `anchor_origin()` converts the anchor point to a top-left origin, and
+  `blit_xform()` now also applies the 8 Sprite transforms (the swap of on-screen
+  w/h for the rot90/270 family feeds the anchor maths). `lcdui.c`.
+  *Symptom that pointed here: intro logos in the corner, DOOM RPG title clipped.*

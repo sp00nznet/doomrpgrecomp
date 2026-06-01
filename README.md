@@ -96,7 +96,7 @@ all fixed-point integer math (there's a `sintable.bin` in the JAR to prove it).
 | **Launches + runs the game loop** | ✅ boots, no crashes, loop alive |
 | PNG decode (own inflate, no zlib) | ✅ verified pixel-exact vs reference |
 | **Renders the intro** | ✅ copyright → JAMDAT → Fountainhead splashes |
-| Boots to main menu | 🔨 in progress |
+| **Boots to main menu** | ✅ reaches the "Enable sounds?" prompt, logo placed |
 | Playable | ⬜ |
 
 See [`docs/`](docs/) for the running design notes and the bug ledger (every

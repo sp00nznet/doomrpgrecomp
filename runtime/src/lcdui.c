@@ -65,27 +65,67 @@ jint m_javax_microedition_lcdui_Graphics__getClipY____I(jref this_) { return ((G
 jint m_javax_microedition_lcdui_Graphics__getClipWidth____I(jref this_) { return ((GraphicsObj *)this_)->cw; }
 jint m_javax_microedition_lcdui_Graphics__getClipHeight____I(jref this_) { return ((GraphicsObj *)this_)->ch; }
 
-static void blit_region(GraphicsObj *g, ImageObj *img, jint sx, jint sy, jint sw, jint sh,
-                        jint dx, jint dy) {
+/* MIDP anchor bits (Graphics) and Sprite transform codes (Image.drawRegion). */
+enum { A_HCENTER = 1, A_VCENTER = 2, A_LEFT = 4, A_RIGHT = 8,
+       A_TOP = 16, A_BOTTOM = 32, A_BASELINE = 64 };
+
+/* MIDP places the image so its anchor point coincides with (dx,dy); convert
+ * that to a top-left origin given the (possibly transform-swapped) out dims. */
+static void anchor_origin(jint anchor, jint dx, jint dy, jint ow, jint oh,
+                          jint *tx, jint *ty) {
+    if (anchor & A_HCENTER)       *tx = dx - ow / 2;
+    else if (anchor & A_RIGHT)    *tx = dx - ow;
+    else                          *tx = dx;                 /* LEFT / default */
+    if (anchor & A_VCENTER)       *ty = dy - oh / 2;
+    else if (anchor & (A_BOTTOM | A_BASELINE)) *ty = dy - oh;
+    else                          *ty = dy;                 /* TOP / default */
+}
+
+/* Blit an sw x sh source region with origin at top-left (tx,ty), applying one
+ * of the 8 MIDP Sprite transforms (0=none,1=vmirror,2=hmirror,3=rot180,
+ * 4=transpose,5=rot90,6=rot270,7=anti-transpose). */
+static void blit_xform(GraphicsObj *g, ImageObj *img, jint sx, jint sy, jint sw, jint sh,
+                       jint transform, jint tx, jint ty) {
     if (!img || !img->px) return;
     for (jint j = 0; j < sh; j++) for (jint i = 0; i < sw; i++) {
         jint ix = sx + i, iy = sy + j;
         if (ix < 0 || iy < 0 || ix >= img->w || iy >= img->h) continue;
         uint32_t p = img->px[iy * img->w + ix];
-        if (p >> 24) plot(g, dx + i, dy + j, p);   /* respect alpha (skip transparent) */
+        if (!(p >> 24)) continue;                  /* skip transparent */
+        jint ox, oy;
+        switch (transform) {
+            default:
+            case 0: ox = i;          oy = j;          break;
+            case 1: ox = i;          oy = sh - 1 - j; break;
+            case 2: ox = sw - 1 - i; oy = j;          break;
+            case 3: ox = sw - 1 - i; oy = sh - 1 - j; break;
+            case 4: ox = j;          oy = i;          break;
+            case 5: ox = sh - 1 - j; oy = i;          break;
+            case 6: ox = j;          oy = sw - 1 - i; break;
+            case 7: ox = sh - 1 - j; oy = sw - 1 - i; break;
+        }
+        plot(g, tx + ox, ty + oy, p);
     }
 }
 void m_javax_microedition_lcdui_Graphics__drawImage__Ljavax_microedition_lcdui_ImageIII__V(
         jref this_, jref img, jint x, jint y, jint anchor) {
-    (void)anchor;   /* TODO: anchor handling; game mostly uses TOP|LEFT */
     ImageObj *im = (ImageObj *)img;
-    if (im) blit_region((GraphicsObj *)this_, im, 0, 0, im->w, im->h, x, y);
+    if (!im) return;
+    jint tx, ty;
+    anchor_origin(anchor, x, y, im->w, im->h, &tx, &ty);
+    blit_xform((GraphicsObj *)this_, im, 0, 0, im->w, im->h, 0, tx, ty);
 }
 void m_javax_microedition_lcdui_Graphics__drawRegion__Ljavax_microedition_lcdui_ImageIIIIIIII__V(
         jref this_, jref img, jint sx, jint sy, jint sw, jint sh, jint transform,
         jint dx, jint dy, jint anchor) {
-    (void)transform; (void)anchor;   /* TODO: transforms (flip/rotate) + anchor */
-    blit_region((GraphicsObj *)this_, (ImageObj *)img, sx, sy, sw, sh, dx, dy);
+    ImageObj *im = (ImageObj *)img;
+    if (!im) return;
+    /* transforms 4..7 rotate by 90/270, swapping the on-screen dimensions */
+    jint ow = (transform >= 4) ? sh : sw;
+    jint oh = (transform >= 4) ? sw : sh;
+    jint tx, ty;
+    anchor_origin(anchor, dx, dy, ow, oh, &tx, &ty);
+    blit_xform((GraphicsObj *)this_, im, sx, sy, sw, sh, transform, tx, ty);
 }
 void m_javax_microedition_lcdui_Graphics__drawRGB__aIIIIIIIZ__V(
         jref this_, jref rgb, jint off, jint scan, jint x, jint y, jint w, jint h, jint alpha) {
@@ -146,7 +186,12 @@ void m_javax_microedition_lcdui_game_GameCanvas__flushGraphics____V(jref this_) 
     const uint32_t *fb = (const uint32_t *)gc->offscreen;
     display_present(fb);
     display_pump();
-    /* Debug: if DOOMRPG_DUMP is set, write the latest frame as a PPM there. */
+    /* Debug: if DOOMRPG_DUMP is set, write the latest frame as a PPM there.
+     * If DOOMRPG_DUMPDIR is set, write every Nth frame as a numbered PPM into
+     * that directory (frame00000.ppm, ...) so a whole boot sequence is captured.
+     * DOOMRPG_DUMPN controls the sampling stride (default 8); DOOMRPG_DUMPMAX
+     * caps the number of files written (default 400). */
+    static int s_frame = 0, s_written = 0;
     const char *dump = getenv("DOOMRPG_DUMP");
     if (dump) {
         FILE *f = fopen(dump, "wb");
@@ -157,6 +202,27 @@ void m_javax_microedition_lcdui_game_GameCanvas__flushGraphics____V(jref this_) 
                 fputc((p >> 16) & 0xFF, f); fputc((p >> 8) & 0xFF, f); fputc(p & 0xFF, f);
             }
             fclose(f);
+        }
+    }
+    const char *dumpdir = getenv("DOOMRPG_DUMPDIR");
+    if (dumpdir) {
+        const char *sn = getenv("DOOMRPG_DUMPN");
+        const char *sm = getenv("DOOMRPG_DUMPMAX");
+        int stride = sn ? atoi(sn) : 8;
+        int cap = sm ? atoi(sm) : 400;
+        if (stride < 1) stride = 1;
+        if ((s_frame++ % stride) == 0 && s_written < cap) {
+            char path[512];
+            snprintf(path, sizeof path, "%s/frame%05d.ppm", dumpdir, s_written++);
+            FILE *f = fopen(path, "wb");
+            if (f) {
+                fprintf(f, "P6\n%d %d\n255\n", SCREEN_W, SCREEN_H);
+                for (int i = 0; i < SCREEN_W * SCREEN_H; i++) {
+                    uint32_t p = fb[i];
+                    fputc((p >> 16) & 0xFF, f); fputc((p >> 8) & 0xFF, f); fputc(p & 0xFF, f);
+                }
+                fclose(f);
+            }
         }
     }
 }
