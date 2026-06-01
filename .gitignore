@@ -1,0 +1,48 @@
+# Build artifacts
+build/
+*.o
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.elf
+*.a
+*.lib
+*.dll
+*.so
+*.dylib
+*.exp
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Copyrighted game data -- bring your own legally-obtained JAR
+game/*.jar
+game/*.zip
+game/extracted/
+*.jar
+*.class
+*.bsp
+*.str
+*.mid
+*.bin
+*.db
+*.map
+*.png
+# (the runtime ships no art; assets are loaded from the user's JAR at build/runtime)
+
+# Generated C is reproducible from the JAR -- regenerate with the recompiler
+generated/*.c
+generated/*.h
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,208 @@
+======================================================================
+  Doom RPG :: class inventory
+======================================================================
+  DoomRPG        class     v45.3   super=javax/microedition/midlet/MIDlet methods=5   fields=7
+  a              class     v45.3   super=java/lang/Object         methods=1   fields=3
+  b              class     v45.3   super=java/lang/Object         methods=16  fields=19
+  c              class     v45.3   super=java/lang/Object         methods=7   fields=3
+  d              class     v45.3   super=java/lang/Object         methods=13  fields=272
+  e              class     v45.3   super=java/lang/Object         methods=4   fields=7
+  f              class     v45.3   super=java/lang/Object         methods=7   fields=11
+  g              class     v45.3   super=java/lang/Object         methods=4   fields=8
+  h              class     v45.3   super=java/lang/Object         methods=4   fields=1
+  i              class     v45.3   super=java/lang/Object         methods=19  fields=23
+  j              class     v45.3   super=java/lang/Object         methods=34  fields=29
+  k              class     v45.3   super=javax/microedition/lcdui/game/GameCanvas methods=77  fields=125
+  l              class     v45.3   super=java/lang/Object         methods=1   fields=4
+  m              class     v45.3   super=java/lang/Object         methods=1   fields=7
+  n              class     v45.3   super=java/lang/Object         methods=1   fields=8
+  o              class     v45.3   super=java/lang/Object         methods=2   fields=7
+  p              class     v45.3   super=java/lang/Object         methods=2   fields=8
+  q              class     v45.3   super=java/lang/Object         methods=10  fields=28
+  r              class     v45.3   super=java/lang/Object         methods=40  fields=76
+  s              class     v45.3   super=java/lang/Object         methods=49  fields=50
+  t              class     v45.3   super=java/lang/Object         methods=24  fields=8
+  u              class     v45.3   super=java/lang/Object         methods=24  fields=15
+  v              class     v45.3   super=java/lang/Object         methods=20  fields=9
+  w              class     v45.3   super=java/lang/Object         methods=3   fields=4
+  x              class     v45.3   super=java/lang/Object         methods=1   fields=8
+  y              class     v45.3   super=java/lang/Object         methods=14  fields=15
+----------------------------------------------------------------------
+  classes=26  methods=383  (with code: 383)  fields=755
+  distinct opcodes used: 127
+  all opcodes recognized by the translator's opcode table [OK]
+----------------------------------------------------------------------
+  external classes referenced (the runtime contract):
+    java/io/ByteArrayInputStream
+    java/io/ByteArrayOutputStream
+    java/io/DataInput
+    java/io/DataInputStream
+    java/io/DataOutputStream
+    java/io/IOException
+    java/io/InputStream
+    java/io/PrintStream
+    java/lang/Class
+    java/lang/Error
+    java/lang/Exception
+    java/lang/IllegalArgumentException
+    java/lang/Integer
+    java/lang/InterruptedException
+    java/lang/Long
+    java/lang/Math
+    java/lang/Object
+    java/lang/Runnable
+    java/lang/Runtime
+    java/lang/RuntimeException
+    java/lang/String
+    java/lang/StringBuffer
+    java/lang/System
+    java/lang/Thread
+    java/lang/Throwable
+    java/util/Random
+    java/util/Vector
+    javax/microedition/lcdui/Alert
+    javax/microedition/lcdui/AlertType
+    javax/microedition/lcdui/Canvas
+    javax/microedition/lcdui/Display
+    javax/microedition/lcdui/Graphics
+    javax/microedition/lcdui/Image
+    javax/microedition/lcdui/game/GameCanvas
+    javax/microedition/media/Controllable
+    javax/microedition/media/Manager
+    javax/microedition/media/Player
+    javax/microedition/media/control/VolumeControl
+    javax/microedition/midlet/MIDlet
+    javax/microedition/midlet/MIDletStateChangeException
+    javax/microedition/rms/RecordEnumeration
+    javax/microedition/rms/RecordStore
+----------------------------------------------------------------------
+  external methods referenced: 129
+    java/io/ByteArrayInputStream.<init>([B)V
+    java/io/ByteArrayOutputStream.<init>()V
+    java/io/ByteArrayOutputStream.toByteArray()[B
+    java/io/DataInput.readByte()B
+    java/io/DataInputStream.<init>(Ljava/io/InputStream;)V
+    java/io/DataInputStream.read()I
+    java/io/DataInputStream.readBoolean()Z
+    java/io/DataInputStream.readByte()B
+    java/io/DataInputStream.readInt()I
+    java/io/DataInputStream.readLong()J
+    java/io/DataInputStream.readShort()S
+    java/io/DataInputStream.readUTF()Ljava/lang/String;
+    java/io/DataOutputStream.<init>(Ljava/io/OutputStream;)V
+    java/io/DataOutputStream.writeBoolean(Z)V
+    java/io/DataOutputStream.writeByte(I)V
+    java/io/DataOutputStream.writeInt(I)V
+    java/io/DataOutputStream.writeLong(J)V
+    java/io/DataOutputStream.writeShort(I)V
+    java/io/DataOutputStream.writeUTF(Ljava/lang/String;)V
+    java/io/InputStream.close()V
+    java/io/InputStream.read()I
+    java/io/InputStream.read([BII)I
+    java/io/InputStream.skip(J)J
+    java/io/PrintStream.println(Ljava/lang/String;)V
+    java/lang/Class.forName(Ljava/lang/String;)Ljava/lang/Class;
+    java/lang/Class.getResourceAsStream(Ljava/lang/String;)Ljava/io/InputStream;
+    java/lang/Exception.<init>(Ljava/lang/String;)V
+    java/lang/Integer.<init>(I)V
+    java/lang/Integer.parseInt(Ljava/lang/String;)I
+    java/lang/Integer.toString(I)Ljava/lang/String;
+    java/lang/Long.toString(J)Ljava/lang/String;
+    java/lang/Math.abs(I)I
+    java/lang/Math.max(II)I
+    java/lang/Object.<init>()V
+    java/lang/Object.getClass()Ljava/lang/Class;
+    java/lang/Runtime.freeMemory()J
+    java/lang/Runtime.getRuntime()Ljava/lang/Runtime;
+    java/lang/Runtime.totalMemory()J
+    java/lang/String.<init>([CII)V
+    java/lang/String.charAt(I)C
+    java/lang/String.compareTo(Ljava/lang/String;)I
+    java/lang/String.equals(Ljava/lang/Object;)Z
+    java/lang/String.indexOf(II)I
+    java/lang/String.lastIndexOf(I)I
+    java/lang/String.length()I
+    java/lang/String.replace(CC)Ljava/lang/String;
+    java/lang/String.startsWith(Ljava/lang/String;)Z
+    java/lang/String.substring(I)Ljava/lang/String;
+    java/lang/String.substring(II)Ljava/lang/String;
+    java/lang/String.valueOf(C)Ljava/lang/String;
+    java/lang/StringBuffer.<init>()V
+    java/lang/StringBuffer.<init>(I)V
+    java/lang/StringBuffer.<init>(Ljava/lang/String;)V
+    java/lang/StringBuffer.append(C)Ljava/lang/StringBuffer;
+    java/lang/StringBuffer.append(I)Ljava/lang/StringBuffer;
+    java/lang/StringBuffer.append(J)Ljava/lang/StringBuffer;
+    java/lang/StringBuffer.append(Ljava/lang/Object;)Ljava/lang/StringBuffer;
+    java/lang/StringBuffer.append(Ljava/lang/String;)Ljava/lang/StringBuffer;
+    java/lang/StringBuffer.charAt(I)C
+    java/lang/StringBuffer.insert(IC)Ljava/lang/StringBuffer;
+    java/lang/StringBuffer.insert(ILjava/lang/Object;)Ljava/lang/StringBuffer;
+    java/lang/StringBuffer.insert(ILjava/lang/String;)Ljava/lang/StringBuffer;
+    java/lang/StringBuffer.length()I
+    java/lang/StringBuffer.setCharAt(IC)V
+    java/lang/StringBuffer.setLength(I)V
+    java/lang/StringBuffer.toString()Ljava/lang/String;
+    java/lang/System.arraycopy(Ljava/lang/Object;ILjava/lang/Object;II)V
+    java/lang/System.currentTimeMillis()J
+    java/lang/System.gc()V
+    java/lang/System.getProperty(Ljava/lang/String;)Ljava/lang/String;
+    java/lang/Thread.<init>(Ljava/lang/Runnable;)V
+    java/lang/Thread.sleep(J)V
+    java/lang/Thread.start()V
+    java/lang/Throwable.toString()Ljava/lang/String;
+    java/util/Random.<init>()V
+    java/util/Random.nextInt()I
+    java/util/Vector.<init>()V
+    java/util/Vector.addElement(Ljava/lang/Object;)V
+    java/util/Vector.elementAt(I)Ljava/lang/Object;
+    java/util/Vector.size()I
+    javax/microedition/lcdui/Alert.<init>(Ljava/lang/String;)V
+    javax/microedition/lcdui/Alert.setString(Ljava/lang/String;)V
+    javax/microedition/lcdui/Alert.setTimeout(I)V
+    javax/microedition/lcdui/Alert.setType(Ljavax/microedition/lcdui/AlertType;)V
+    javax/microedition/lcdui/Canvas.getGameAction(I)I
+    javax/microedition/lcdui/Canvas.setFullScreenMode(Z)V
+    javax/microedition/lcdui/Display.getDisplay(Ljavax/microedition/midlet/MIDlet;)Ljavax/microedition/lcdui/Display;
+    javax/microedition/lcdui/Display.setCurrent(Ljavax/microedition/lcdui/Displayable;)V
+    javax/microedition/lcdui/Display.vibrate(I)Z
+    javax/microedition/lcdui/Graphics.drawImage(Ljavax/microedition/lcdui/Image;III)V
+    javax/microedition/lcdui/Graphics.drawLine(IIII)V
+    javax/microedition/lcdui/Graphics.drawRGB([IIIIIIIZ)V
+    javax/microedition/lcdui/Graphics.drawRect(IIII)V
+    javax/microedition/lcdui/Graphics.drawRegion(Ljavax/microedition/lcdui/Image;IIIIIIII)V
+    javax/microedition/lcdui/Graphics.fillRect(IIII)V
+    javax/microedition/lcdui/Graphics.getClipHeight()I
+    javax/microedition/lcdui/Graphics.getClipWidth()I
+    javax/microedition/lcdui/Graphics.getClipX()I
+    javax/microedition/lcdui/Graphics.getClipY()I
+    javax/microedition/lcdui/Graphics.getTranslateX()I
+    javax/microedition/lcdui/Graphics.getTranslateY()I
+    javax/microedition/lcdui/Graphics.setClip(IIII)V
+    javax/microedition/lcdui/Graphics.setColor(I)V
+    javax/microedition/lcdui/Graphics.translate(II)V
+    javax/microedition/lcdui/Image.createImage(Ljava/lang/String;)Ljavax/microedition/lcdui/Image;
+    javax/microedition/lcdui/game/GameCanvas.<init>(Z)V
+    javax/microedition/lcdui/game/GameCanvas.flushGraphics()V
+    javax/microedition/lcdui/game/GameCanvas.getGraphics()Ljavax/microedition/lcdui/Graphics;
+    javax/microedition/media/Controllable.getControl(Ljava/lang/String;)Ljavax/microedition/media/Control;
+    javax/microedition/media/Manager.createPlayer(Ljava/io/InputStream;Ljava/lang/String;)Ljavax/microedition/media/Player;
+    javax/microedition/media/Player.close()V
+    javax/microedition/media/Player.getState()I
+    javax/microedition/media/Player.realize()V
+    javax/microedition/media/Player.setLoopCount(I)V
+    javax/microedition/media/Player.start()V
+    javax/microedition/media/control/VolumeControl.setLevel(I)I
+    javax/microedition/midlet/MIDlet.<init>()V
+    javax/microedition/midlet/MIDlet.getAppProperty(Ljava/lang/String;)Ljava/lang/String;
+    javax/microedition/midlet/MIDlet.notifyDestroyed()V
+    javax/microedition/rms/RecordEnumeration.nextRecordId()I
+    javax/microedition/rms/RecordStore.addRecord([BII)I
+    javax/microedition/rms/RecordStore.closeRecordStore()V
+    javax/microedition/rms/RecordStore.deleteRecordStore(Ljava/lang/String;)V
+    javax/microedition/rms/RecordStore.enumerateRecords(Ljavax/microedition/rms/RecordFilter;Ljavax/microedition/rms/RecordComparator;Z)Ljavax/microedition/rms/RecordEnumeration;
+    javax/microedition/rms/RecordStore.getNumRecords()I
+    javax/microedition/rms/RecordStore.getRecord(I)[B
+    javax/microedition/rms/RecordStore.listRecordStores()[Ljava/lang/String;
+    javax/microedition/rms/RecordStore.openRecordStore(Ljava/lang/String;Z)Ljavax/microedition/rms/RecordStore;
+    javax/microedition/rms/RecordStore.setRecord(I[BII)V
