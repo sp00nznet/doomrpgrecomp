@@ -96,9 +96,12 @@ generated/             translator output (one .c/.h per class)  [gitignored]
 5. ✅ Runtime implemented (all 129 methods), links to a native `DoomRPG.exe`,
    launches, and **runs the game loop without crashing**. SDL2 window + keyboard,
    real MIDI via MCI, `.rms` saves, asset loading from the extracted JAR.
-6. ⏭ PNG decode so the splash/menus actually paint (screen is currently black —
-   art is image-driven and `createImage` returns a sized-but-empty placeholder).
-7. ⏭ Verify the draw path end-to-end; fill in `drawRegion` transforms/anchors.
+6. ✅ PNG decode (`png.c`, hand-written DEFLATE inflate + filters, palette/RGB/
+   gray, tRNS) — verified pixel-exact against a Python reference. The game now
+   renders its intro splashes (copyright text, JAMDAT, Fountainhead).
+7. ⏭ Push through to the main menu; fill in `drawRegion` transforms (flip/rotate)
+   and `drawImage` anchors so sprites land correctly; verify input advances menus.
+   Debug aid: set `DOOMRPG_DUMP=path.ppm` to dump the framebuffer each flush.
 
 ### Runtime implementation notes
 - Dispatch: runtime singletons (Runtime/Display) and wrapper objects must carry a

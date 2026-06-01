@@ -140,6 +140,9 @@ jref   j_make_class_object(const jclass *target);                /* java.lang.Cl
 /* a java.lang.Class instance wraps the jclass it represents */
 typedef struct ClassObj { jobject hdr; const jclass *target; } ClassObj;
 
+/* ---- PNG decode (our own inflate; no zlib) --------------------------------- */
+uint32_t *png_decode(const uint8_t *data, int len, int *w, int *h);  /* ARGB, malloc'd, or NULL */
+
 /* ---- assets (resources packed in the JAR) --------------------------------- */
 int    assets_open(const char *jar_or_dir);
 uint8_t *assets_get(const char *name, int *out_len);  /* borrowed bytes, or NULL */

@@ -11,6 +11,8 @@
  */
 #include "j2me/runtime.h"
 #include "doomrpg.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 static uint32_t rgb_to_argb(jint rgb) { return 0xFF000000u | ((uint32_t)rgb & 0xFFFFFF); }
 
@@ -108,16 +110,13 @@ jref m_javax_microedition_lcdui_Image__createImage__Ljava_lang_String__Ljavax_mi
     const char *p = (*n == '/') ? n + 1 : n;
     int len = 0;
     uint8_t *bytes = assets_get(p, &len);
-    jint w = 16, h = 16;
-    if (bytes && len >= 24 && bytes[0] == 0x89 && bytes[1] == 'P') {
-        /* read PNG IHDR width/height (big-endian at offset 16/20) */
-        w = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
-        h = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
-        if (w <= 0 || w > 1024 || h <= 0 || h > 1024) { w = 16; h = 16; }
-    }
     free(n);
+    int w = 0, h = 0;
+    uint32_t *px = bytes ? png_decode(bytes, len, &w, &h) : NULL;
+    if (!px) return make_image(16, 16);   /* decode failed: empty placeholder */
     jref img = make_image(w, h);
-    /* TODO: real PNG decode. Placeholder: transparent so it doesn't paint junk. */
+    memcpy(((ImageObj *)img)->px, px, (size_t)w * h * sizeof(uint32_t));
+    free(px);
     return img;
 }
 
@@ -144,8 +143,22 @@ jref m_javax_microedition_lcdui_game_GameCanvas__getGraphics____Ljavax_microedit
 }
 void m_javax_microedition_lcdui_game_GameCanvas__flushGraphics____V(jref this_) {
     GameCanvasObj *gc = (GameCanvasObj *)this_;
-    display_present((const uint32_t *)gc->offscreen);
+    const uint32_t *fb = (const uint32_t *)gc->offscreen;
+    display_present(fb);
     display_pump();
+    /* Debug: if DOOMRPG_DUMP is set, write the latest frame as a PPM there. */
+    const char *dump = getenv("DOOMRPG_DUMP");
+    if (dump) {
+        FILE *f = fopen(dump, "wb");
+        if (f) {
+            fprintf(f, "P6\n%d %d\n255\n", SCREEN_W, SCREEN_H);
+            for (int i = 0; i < SCREEN_W * SCREEN_H; i++) {
+                uint32_t p = fb[i];
+                fputc((p >> 16) & 0xFF, f); fputc((p >> 8) & 0xFF, f); fputc(p & 0xFF, f);
+            }
+            fclose(f);
+        }
+    }
 }
 
 /* ===== Display ============================================================= */

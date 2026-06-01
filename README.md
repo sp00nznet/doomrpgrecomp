@@ -94,8 +94,9 @@ all fixed-point integer math (there's a `sintable.bin` in the JAR to prove it).
 | SDL2 display + input | ✅ integer-scaled window, keyboard |
 | Windows MIDI playback | ✅ via MCI (real General MIDI) |
 | **Launches + runs the game loop** | ✅ boots, no crashes, loop alive |
-| PNG decode (visible art on screen) | 🔨 next — splash/menus are image-driven |
-| Boots to main menu | ⬜ (after PNG decode) |
+| PNG decode (own inflate, no zlib) | ✅ verified pixel-exact vs reference |
+| **Renders the intro** | ✅ copyright → JAMDAT → Fountainhead splashes |
+| Boots to main menu | 🔨 in progress |
 | Playable | ⬜ |
 
 See [`docs/`](docs/) for the running design notes and the bug ledger (every
