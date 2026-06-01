@@ -11,6 +11,7 @@
 #include "devgui.h"
 #include "devcheats.h"
 #include "savestate.h"
+#include "devsaves.h"
 #include "devaudio.h"
 #include "devinput.h"
 #include "imgui.h"
@@ -100,6 +101,32 @@ static void build_bar(void)
                 set_msg(r == 0 ? "state loaded" : r == -2 ? "from another session" : "load failed");
             }
             ImGui::TextDisabled("%s", has ? "slot has data" : "slot empty");
+
+            ImGui::Separator();
+            /* the game's own RecordStore saves, backed up to numbered slots */
+            if (ImGui::BeginMenu("Game saves (.rms)")) {
+                ImGui::TextDisabled("backs up Config/Player/World; load via the");
+                ImGui::TextDisabled("game's own \"Continue\" after restoring.");
+                ImGui::Separator();
+                for (int s = 1; s <= 5; s++) {
+                    ImGui::PushID(s);
+                    bool shas = devsaves_slot_exists(s) != 0;
+                    ImGui::Text("Slot %d %s", s, shas ? "(saved)" : "(empty)");
+                    ImGui::SameLine(150);
+                    if (ImGui::SmallButton("Backup")) {
+                        int r = devsaves_backup(s);
+                        snprintf(g_msg, sizeof g_msg, r > 0 ? "backed up %d files to slot %d"
+                                 : "no game save to back up", r, s);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Restore")) {
+                        int r = devsaves_restore(s);
+                        set_msg(r > 0 ? "restored; use Continue to load" : "slot empty");
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::EndMenu();
+            }
             if (g_msg[0]) { ImGui::Separator(); ImGui::TextDisabled("%s", g_msg); }
             ImGui::EndMenu();
         }

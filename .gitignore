@@ -47,8 +47,9 @@ generated/*.h
 Thumbs.db
 desktop.ini
 
-# Runtime RecordStore saves the game writes next to the exe / cwd
+# Runtime RecordStore saves the game writes next to the exe / cwd (and slot backups)
 *.rms
+gameslot*_*.rms
 
 # Dev-menu runtime files (controls config, emulator save states)
 controls.cfg
