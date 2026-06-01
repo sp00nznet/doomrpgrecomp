@@ -49,3 +49,8 @@ desktop.ini
 
 # Runtime RecordStore saves the game writes next to the exe / cwd
 *.rms
+
+# Dev-menu runtime files (controls config, emulator save states)
+controls.cfg
+savestate*.bin
+sstest.bin

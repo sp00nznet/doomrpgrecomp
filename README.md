@@ -100,7 +100,24 @@ all fixed-point integer math (there's a `sintable.bin` in the JAR to prove it).
 | **Menu input works** | ✅ d-pad/fire navigate; New Game → the Mars briefing |
 | **In-game (3D dungeon)** | ✅ briefing → approach cinematic → textured 3D view + HUD |
 | **Movement / turning** | ✅ d-pad turns and walks the first-person view |
+| **Dev / cheat menu (ImGui)** | ✅ File·Debug·Graphics·Audio·Controls bar over the game |
 | Playable | 🔨 renders + moves; combat / items / maps still to exercise |
+
+### Dev / cheat menu
+
+A Dear ImGui bar docks across the top of the window with the game viewport
+below it — shippable as a player cheat/options menu. Because the recomp turns
+every game variable into a native C global, the menu pokes the real game state
+directly:
+
+- **File** — New Game, plus 9 emulator-style **save states** (full snapshot of
+  the bump-arena heap + every static global; restore is a memcpy).
+- **Debug** — Godmode / infinite ammo / give HP·armor·ammo, **level warp** (any
+  `.bsp`), **state jump**, and the game's built-in debug counters.
+- **Graphics** — window scale, nearest/linear filter, scanline overlay.
+- **Audio** — master volume + mute (Windows audio session) and music (MCI).
+- **Controls** — rebindable **keyboard + Xbox controller** (left stick drives
+  the d-pad), persisted to `controls.cfg`.
 
 See [`docs/`](docs/) for the running design notes and the bug ledger (every
 recomp accrues a glorious list of "found-and-fixed" war stories — ours starts

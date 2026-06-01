@@ -115,7 +115,14 @@ generated/             translator output (one .c/.h per class)  [gitignored]
    ammo + Menu/Map soft labels) below it; the d-pad turns and walks. The BSP
    renderer, texture mapping and sprite blitting all came up with no extra changes
    once input + screen size were fixed — verified headlessly via `DOOMRPG_KEYS`.
-10. ⏭ Exercise gameplay depth: combat (firing, enemies), item/inventory use, the
+10. ✅ Dev/cheat menu (Dear ImGui, docked top bar + game viewport below). Ships as
+   a player cheat/options menu: File (New + emulator save states), Debug (godmode/
+   give/warp/state), Graphics (scale/filter/scanlines), Audio (master+music),
+   Controls (rebindable keyboard + Xbox pad). Runtime: `devgui.cpp` (UI),
+   `devcheats.c` (pokes player globals), `savestate.c` + generated registry,
+   `devaudio.c` (Core Audio), `devinput.c` (bindings/controller). The bump-arena
+   in `jvm_core.c` (fixed-base VirtualAlloc) is what makes save states a memcpy.
+11. ⏭ Exercise gameplay depth: combat (firing, enemies), item/inventory use, the
    automap, doors/level transitions, and save/restore via the `.rms` store.
 
 ### Runtime implementation notes
