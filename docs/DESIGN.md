@@ -93,7 +93,22 @@ generated/             translator output (one .c/.h per class)  [gitignored]
 4. ⏭ J2ME runtime bodies: java.lang/io/util first (no I/O surprises), then
    lcdui on SDL2. 129 runtime methods / 21 classes / 2 statics to implement
    (the exact list falls out of `jrecomp translate`).
-5. ⏭ Link + boot the MIDlet → EA splash → main menu.
+5. ✅ Runtime implemented (all 129 methods), links to a native `DoomRPG.exe`,
+   launches, and **runs the game loop without crashing**. SDL2 window + keyboard,
+   real MIDI via MCI, `.rms` saves, asset loading from the extracted JAR.
+6. ⏭ PNG decode so the splash/menus actually paint (screen is currently black —
+   art is image-driven and `createImage` returns a sized-but-empty placeholder).
+7. ⏭ Verify the draw path end-to-end; fill in `drawRegion` transforms/anchors.
+
+### Runtime implementation notes
+- Dispatch: runtime singletons (Runtime/Display) and wrapper objects must carry a
+  real `jclass` whose table holds the virtually-called methods — booting was a
+  sequence of "give class X its method table" fixes (Runtime, Display, MIDlet…).
+- Threads: `Thread.start()` runs `run()` inline; `Thread.sleep()` pumps SDL.
+- Exceptions classes carry the real super chain (RuntimeException⊂Exception, …)
+  so the translator's `j_instanceof`-based catch dispatch matches Java.
+- MIDI: SMF bytes spilled to a temp `.mid`, played via Windows MCI.
+- Build: `build.ps1` (recompile → cl → link → stage assets+SDL2.dll).
 
 ### Translator implementation notes
 - Stack entries are single-tagged (`i/l/f/d/a`); long/double are one entry

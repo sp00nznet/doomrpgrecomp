@@ -89,11 +89,13 @@ all fixed-point integer math (there's a `sintable.bin` in the JAR to prove it).
 |---|---|
 | `.class` parser (const pool / fields / methods / code) | ✅ all 26 classes |
 | Bytecode → C translator | ✅ 383/383 methods → C, **compiles clean** (MSVC) |
-| J2ME runtime (lcdui / rms / media) | 🔨 next: the hand-written bodies |
-| SDL2 display + input | ⬜ not started |
-| Windows MIDI playback | ⬜ not started |
-| Boots to EA splash | ⬜ |
-| Boots to main menu | ⬜ |
+| J2ME runtime (lang / io / util / lcdui / media / rms) | ✅ all 129 methods implemented |
+| Links to a native `DoomRPG.exe` | ✅ zero unresolved symbols |
+| SDL2 display + input | ✅ integer-scaled window, keyboard |
+| Windows MIDI playback | ✅ via MCI (real General MIDI) |
+| **Launches + runs the game loop** | ✅ boots, no crashes, loop alive |
+| PNG decode (visible art on screen) | 🔨 next — splash/menus are image-driven |
+| Boots to main menu | ⬜ (after PNG decode) |
 | Playable | ⬜ |
 
 See [`docs/`](docs/) for the running design notes and the bug ledger (every
