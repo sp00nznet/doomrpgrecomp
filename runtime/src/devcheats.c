@@ -89,3 +89,6 @@ void        cheats_warp(int i) {
     if (i < 0 || i >= cheats_level_count()) return;
     m_k__a__Ljava_lang_String__V(j_strlit(k_levels[i]));
 }
+
+/* Start a fresh run at the first playable level (index 1 = /junction.bsp). */
+void cheats_new_game(void) { cheats_warp(1); }

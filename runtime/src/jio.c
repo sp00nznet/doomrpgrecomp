@@ -77,7 +77,7 @@ jlong m_java_io_DataInputStream__readLong____J(jref this_) {
 jref m_java_io_DataInputStream__readUTF____Ljava_lang_String(jref this_) {
     int hi = dis_u8(this_), lo = dis_u8(this_);
     int n = (hi << 8) | lo;
-    char *tmp = (char *)j_alloc((size_t)n + 1);
+    char *tmp = (char *)malloc((size_t)n + 1);   /* scratch; arena is never freed */
     for (int i = 0; i < n; i++) tmp[i] = (char)dis_u8(this_);
     jref s = j_string_from_utf8(tmp, n);
     free(tmp);

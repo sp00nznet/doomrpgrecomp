@@ -22,6 +22,9 @@ New-Item -ItemType Directory -Force build\obj | Out-Null
 Write-Host "[1/4] Recompiling bytecode -> C ..."
 python tools\recompiler\jrecomp.py translate game\DoomRPG.jar -o generated\
 if ($LASTEXITCODE -ne 0) { throw "recompiler failed" }
+# Emit the savestate registry of every generated static global.
+python tools\gen_savestate.py generated\doomrpg.h generated\savestate_registry.c
+if ($LASTEXITCODE -ne 0) { throw "gen_savestate failed" }
 
 Write-Host "[2/4] Compiling C (generated + runtime) ..."
 # /MD on everything so the C objects match vcpkg's dynamic-CRT imgui.lib.
@@ -35,7 +38,7 @@ cmd /c $compilecpp
 if ($LASTEXITCODE -ne 0) { throw "C++ compile failed" }
 
 Write-Host "[3/4] Linking DoomRPG.exe ..."
-$link = "`"$vcvars`" >nul 2>&1 && link /nologo /SUBSYSTEM:CONSOLE /OUT:build\DoomRPG.exe build\obj\*.obj `"$sdlLib\SDL2.lib`" `"$sdlLib\imgui.lib`" winmm.lib"
+$link = "`"$vcvars`" >nul 2>&1 && link /nologo /SUBSYSTEM:CONSOLE /OUT:build\DoomRPG.exe build\obj\*.obj `"$sdlLib\SDL2.lib`" `"$sdlLib\imgui.lib`" winmm.lib ole32.lib"
 cmd /c $link
 if ($LASTEXITCODE -ne 0) { throw "link failed" }
 

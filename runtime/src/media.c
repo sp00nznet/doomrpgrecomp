@@ -63,8 +63,20 @@ jint m_javax_microedition_media_control_VolumeControl__setLevel__I__I(jref this_
 
 typedef struct MidiClip { char alias[32]; char path[MAX_PATH]; } MidiClip;
 static int g_clip_seq = 0;
+static int g_midi_vol = 1000;          /* 0..1000 */
+static char g_midi_alias[32] = "";     /* last-played clip, for live volume */
 
 void midi_init(void) {}
+
+/* re-issue the MCI sequencer volume on the active clip (best-effort) */
+void midi_set_volume(int milli) {
+    g_midi_vol = milli < 0 ? 0 : milli > 1000 ? 1000 : milli;
+    if (g_midi_alias[0]) {
+        char cmd[96];
+        snprintf(cmd, sizeof cmd, "setaudio %s volume to %d", g_midi_alias, g_midi_vol);
+        mciSendStringA(cmd, 0, 0, 0);
+    }
+}
 
 void *midi_load(const uint8_t *smf, int len) {
     MidiClip *c = (MidiClip *)j_alloc(sizeof(MidiClip));
@@ -82,6 +94,10 @@ void midi_play(void *handle, int loop) {
     char cmd[MAX_PATH + 64];
     snprintf(cmd, sizeof cmd, "open \"%s\" type sequencer alias %s", c->path, c->alias);
     mciSendStringA(cmd, 0, 0, 0);
+    /* remember this clip and apply the current volume to it */
+    snprintf(g_midi_alias, sizeof g_midi_alias, "%s", c->alias);
+    snprintf(cmd, sizeof cmd, "setaudio %s volume to %d", c->alias, g_midi_vol);
+    mciSendStringA(cmd, 0, 0, 0);
     snprintf(cmd, sizeof cmd, "play %s%s from 0", c->alias, loop ? " repeat" : "");
     mciSendStringA(cmd, 0, 0, 0);
 }
@@ -96,6 +112,7 @@ void midi_shutdown(void) { mciSendStringA("close all", 0, 0, 0); }
 
 #else  /* non-Windows: silent stub */
 void  midi_init(void) {}
+void  midi_set_volume(int milli) { (void)milli; }
 void *midi_load(const uint8_t *smf, int len) { (void)smf; (void)len; return 0; }
 void  midi_play(void *h, int loop) { (void)h; (void)loop; }
 void  midi_stop(void *h) { (void)h; }

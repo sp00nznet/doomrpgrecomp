@@ -19,7 +19,8 @@ jref j_string_from_chars(const jchar *chars, jint len) {
 /* decode UTF-8 (with the modified-UTF-8 NUL form tolerated) into jchars */
 jref j_string_from_utf8(const char *u, int len) {
     if (len < 0) len = (int)strlen(u);
-    jchar *tmp = (jchar *)j_alloc((size_t)(len + 1) * sizeof(jchar));
+    /* scratch buffer: malloc (freed below). Arena memory is never freed. */
+    jchar *tmp = (jchar *)malloc((size_t)(len + 1) * sizeof(jchar));
     jint n = 0;
     const unsigned char *p = (const unsigned char *)u, *end = p + len;
     while (p < end) {
@@ -63,6 +64,11 @@ jint j_string_length(jref s) { return s ? ((StringObj *)s)->length : 0; }
  * C-string pointer is stable, so we cache keyed on that pointer. */
 struct intern { const char *key; jref val; struct intern *next; };
 static struct intern *g_intern = NULL;
+
+/* The intern list nodes live in the arena, but this head pointer is a runtime
+ * static -- the savestate layer must snapshot it too, or a restore would leave
+ * it pointing past the rewound arena. Exposed as a void* slot. */
+void **j_intern_head_slot(void) { return (void **)&g_intern; }
 
 jref j_strlit(const char *utf8) {
     for (struct intern *it = g_intern; it; it = it->next)

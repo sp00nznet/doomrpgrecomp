@@ -31,6 +31,7 @@ void cheats_set_state(int st);
 int         cheats_level_count(void);
 const char *cheats_level_name(int i);
 void        cheats_warp(int i);
+void        cheats_new_game(void);
 
 #ifdef __cplusplus
 }

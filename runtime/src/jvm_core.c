@@ -10,16 +10,52 @@
 #include "j2me/runtime.h"
 #include "doomrpg.h"
 #include <stdio.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
-/* ---- allocation ----------------------------------------------------------- */
+/* ---- allocation -----------------------------------------------------------
+ * A single contiguous bump arena (no GC, J2ME heaps are tiny). Keeping every
+ * object in one block at a fixed base is what makes emulator-style savestates
+ * possible: snapshot/restore is just memcpy of [0, used) -- pointers stay valid
+ * because the base never moves. See savestate.c. */
+#define J_ARENA_CAP (96u * 1024u * 1024u)
+static unsigned char *g_arena;
+static size_t g_arena_used;
+
+/* Reserve at a fixed base so absolute pointers in a savestate stay valid even
+ * across process restarts (ASLR would otherwise move a malloc'd block). Falls
+ * back to malloc if the address is unavailable (savestates then same-session). */
+static void arena_init(void) {
+#ifdef _WIN32
+    g_arena = (unsigned char *)VirtualAlloc((void *)0x0000040000000000ull,
+        J_ARENA_CAP, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    if (!g_arena)
+        g_arena = (unsigned char *)VirtualAlloc(NULL, J_ARENA_CAP,
+            MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+#endif
+    if (!g_arena) g_arena = (unsigned char *)malloc(J_ARENA_CAP);
+    if (!g_arena) { fprintf(stderr, "j_alloc: arena reserve failed\n"); abort(); }
+}
+
 void *j_alloc(size_t n) {
-    void *p = calloc(1, n ? n : 1);
-    if (!p) {
+    if (!g_arena) arena_init();
+    if (n == 0) n = 1;
+    n = (n + 7u) & ~(size_t)7u;                 /* 8-byte align */
+    if (g_arena_used + n > J_ARENA_CAP) {
         fprintf(stderr, "j_alloc: out of memory (%zu bytes)\n", n);
         abort();
     }
+    void *p = g_arena + g_arena_used;
+    g_arena_used += n;
+    memset(p, 0, n);                            /* callers rely on zero-init */
     return p;
 }
+
+/* arena accessors for the savestate layer */
+unsigned char *j_arena_base(void) { return g_arena; }
+size_t j_arena_used(void)         { return g_arena_used; }
+void   j_arena_set_used(size_t u) { g_arena_used = u; }
 
 jref j_new(const jclass *cls) {
     jref o = (jref)j_alloc(cls->instance_size);
