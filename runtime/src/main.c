@@ -6,9 +6,11 @@
  * doesn't return until the game ends; a fallback pump loop keeps the window
  * alive if it ever does return early.
  */
+#define SDL_MAIN_HANDLED          /* we provide our own main(); no SDL2main.
+                                   * MUST precede any <SDL.h> (devgui.h pulls it in). */
 #include "j2me/runtime.h"
 #include "doomrpg.h"
-#define SDL_MAIN_HANDLED          /* we provide our own main(); no SDL2main */
+#include "devgui.h"
 #include <SDL.h>
 #include <stdio.h>
 
@@ -18,6 +20,7 @@ void runtime_init_statics(void);          /* class_meta.c */
 /* Thread.sleep() routes here so the inline game loop stays responsive. */
 void runtime_idle(int ms) {
     display_pump();
+    devgui_run_pending();     /* run queued menu actions here, between game frames */
     if (display_should_quit()) g_quit_requested = 1;
     if (ms > 0) SDL_Delay((Uint32)ms);
 }

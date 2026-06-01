@@ -44,6 +44,42 @@ static char g_msg[96] = "";     /* transient status line for save/load etc. */
 static void set_msg(const char *m) { snprintf(g_msg, sizeof g_msg, "%s", m); }
 static void slot_path(char *out, int cap, int slot) { snprintf(out, cap, "savestate%d.bin", slot); }
 
+/* Heavy menu actions (warp, state jump, save/load) must NOT run inside the
+ * ImGui frame -- they call game code that itself calls flushGraphics, which
+ * would re-enter our renderer. We queue them and run them between game frames
+ * (from runtime_idle, via devgui_run_pending). */
+enum PendAct { P_NONE, P_NEWGAME, P_WARP, P_STATE,
+               P_SS_SAVE, P_SS_LOAD, P_RMS_BACKUP, P_RMS_RESTORE };
+static PendAct g_pend = P_NONE;
+static int     g_pend_arg = 0;
+static void queue(PendAct a, int arg) { g_pend = a; g_pend_arg = arg; }
+
+extern "C" void devgui_run_pending(void) {
+    if (g_pend == P_NONE) return;
+    PendAct a = g_pend; int arg = g_pend_arg; g_pend = P_NONE;
+    char p[64];
+    switch (a) {
+        case P_NEWGAME: cheats_new_game(); set_msg("new game"); break;
+        case P_WARP:    cheats_warp(arg);  break;
+        case P_STATE:   cheats_set_state(arg); break;
+        case P_SS_SAVE: slot_path(p, sizeof p, arg);
+                        set_msg(savestate_save(p) == 0 ? "state saved" : "save failed"); break;
+        case P_SS_LOAD: { slot_path(p, sizeof p, arg); int r = savestate_load(p);
+                        set_msg(r == 0 ? "state loaded" : r == -2 ? "from another session" : "load failed"); } break;
+        case P_RMS_BACKUP: { int r = devsaves_backup(arg);
+                        snprintf(g_msg, sizeof g_msg, r > 0 ? "backed up %d files to slot %d"
+                                 : "no game save to back up", r, arg); } break;
+        case P_RMS_RESTORE: { int r = devsaves_restore(arg);
+                        set_msg(r > 0 ? "restored; use Continue to load" : "slot empty"); } break;
+        default: break;
+    }
+}
+
+/* ImGui re-render pacing, decoupled from the game's flush rate */
+static Uint32 g_last_present = 0;
+static int    g_in_present = 0;
+extern "C" int devgui_should_present(void) { return (int)(SDL_GetTicks() - g_last_present) >= 15; }
+
 static void apply_scale(int s) {
     if (s < 1) s = 1; if (s > 8) s = 8;
     g_scale = s;
@@ -86,20 +122,14 @@ static void build_bar(void)
 
         /* ---- File: new game + save states -------------------------------- */
         if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("New Game")) { cheats_new_game(); set_msg("new game"); }
+            if (ImGui::MenuItem("New Game")) queue(P_NEWGAME, 0);
             ImGui::Separator();
             ImGui::SetNextItemWidth(120);
             ImGui::SliderInt("Slot", &g_slot, 1, 9);
             char path[64]; slot_path(path, sizeof path, g_slot);
             bool has = savestate_exists(path) != 0;
-            if (ImGui::MenuItem("Save State")) {
-                int r = savestate_save(path);
-                set_msg(r == 0 ? "state saved" : "save failed");
-            }
-            if (ImGui::MenuItem("Load State", nullptr, false, has)) {
-                int r = savestate_load(path);
-                set_msg(r == 0 ? "state loaded" : r == -2 ? "from another session" : "load failed");
-            }
+            if (ImGui::MenuItem("Save State")) queue(P_SS_SAVE, g_slot);
+            if (ImGui::MenuItem("Load State", nullptr, false, has)) queue(P_SS_LOAD, g_slot);
             ImGui::TextDisabled("%s", has ? "slot has data" : "slot empty");
 
             ImGui::Separator();
@@ -113,16 +143,9 @@ static void build_bar(void)
                     bool shas = devsaves_slot_exists(s) != 0;
                     ImGui::Text("Slot %d %s", s, shas ? "(saved)" : "(empty)");
                     ImGui::SameLine(150);
-                    if (ImGui::SmallButton("Backup")) {
-                        int r = devsaves_backup(s);
-                        snprintf(g_msg, sizeof g_msg, r > 0 ? "backed up %d files to slot %d"
-                                 : "no game save to back up", r, s);
-                    }
+                    if (ImGui::SmallButton("Backup"))  queue(P_RMS_BACKUP, s);
                     ImGui::SameLine();
-                    if (ImGui::SmallButton("Restore")) {
-                        int r = devsaves_restore(s);
-                        set_msg(r > 0 ? "restored; use Continue to load" : "slot empty");
-                    }
+                    if (ImGui::SmallButton("Restore")) queue(P_RMS_RESTORE, s);
                     ImGui::PopID();
                 }
                 ImGui::EndMenu();
@@ -171,7 +194,7 @@ static void build_bar(void)
                 ImGui::Text("Current: %s", cur[0] ? cur : "(none)");
                 ImGui::Separator();
                 for (int i = 0; i < cheats_level_count(); i++)
-                    if (ImGui::MenuItem(cheats_level_name(i))) cheats_warp(i);
+                    if (ImGui::MenuItem(cheats_level_name(i))) queue(P_WARP, i);
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Jump state")) {
@@ -182,10 +205,10 @@ static void build_bar(void)
                     {"Automap (3)", 3}, {"Inventory (6)", 6},
                 };
                 for (auto &q : quick)
-                    if (ImGui::MenuItem(q.name)) cheats_set_state(q.st);
+                    if (ImGui::MenuItem(q.name)) queue(P_STATE, q.st);
                 ImGui::Separator();
-                if (ImGui::MenuItem("State -")) cheats_set_state(cheats_get_state() - 1);
-                if (ImGui::MenuItem("State +")) cheats_set_state(cheats_get_state() + 1);
+                if (ImGui::MenuItem("State -")) queue(P_STATE, cheats_get_state() - 1);
+                if (ImGui::MenuItem("State +")) queue(P_STATE, cheats_get_state() + 1);
                 ImGui::EndMenu();
             }
             ImGui::Separator();
@@ -266,6 +289,9 @@ static void build_bar(void)
 
 void devgui_present(SDL_Texture *game_tex)
 {
+    if (g_in_present) return;           /* never nest ImGui frames (re-entrancy) */
+    g_in_present = 1;
+    g_last_present = SDL_GetTicks();
     cheats_per_frame();                 /* enforce pinned cheats (godmode, etc.) */
 
     ImGui_ImplSDLRenderer2_NewFrame();
@@ -316,6 +342,7 @@ void devgui_present(SDL_Texture *game_tex)
         free(px);
     }
     SDL_RenderPresent(g_ren);
+    g_in_present = 0;
 }
 
 void devgui_shutdown(void)

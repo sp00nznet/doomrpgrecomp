@@ -137,6 +137,10 @@ void display_pump(void) {
         devinput_process_event(&e, devgui_capture_keyboard());
     }
     pump_script();
+    /* Re-render the overlay on its own clock so the menu stays smooth even when
+     * the game flushes rarely (e.g. 1 fps on its menus). Uses the last game
+     * frame already in g_tex. */
+    if (g_tex && devgui_should_present()) devgui_present(g_tex);
 }
 
 int  display_should_quit(void) { return g_quit; }

@@ -34,8 +34,18 @@ int  devgui_capture_mouse(void);
 int  devgui_bar_height(void);
 
 /* Build the dev UI, blit game_tex into the viewport below the bar, draw ImGui
- * over the top, and present the whole window. Replaces a raw RenderPresent. */
+ * over the top, and present the whole window. Replaces a raw RenderPresent.
+ * Re-entrancy-guarded, so it's safe to call from both the game's flushGraphics
+ * and the idle loop. */
 void devgui_present(SDL_Texture *game_tex);
+
+/* 1 if it's been long enough to re-render the overlay (keeps the menu smooth
+ * even when the game itself flushes rarely). */
+int  devgui_should_present(void);
+
+/* Run any menu action queued during the last UI frame (warp, save/load, ...).
+ * Must be called between game frames (from runtime_idle), NOT inside a flush. */
+void devgui_run_pending(void);
 
 void devgui_shutdown(void);
 
