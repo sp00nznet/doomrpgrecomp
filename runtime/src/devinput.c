@@ -65,6 +65,14 @@ void devinput_shutdown(void) {
     if (g_pad) { SDL_GameControllerClose(g_pad); g_pad = 0; }
 }
 
+/* the game's Display.vibrate(ms) routes here -> controller rumble */
+void devinput_rumble(int ms) {
+    if (!g_pad) return;
+    if (ms <= 0) ms = 200;
+    if (ms > 1000) ms = 1000;
+    SDL_GameControllerRumble(g_pad, 0xA000, 0xA000, (Uint32)ms);
+}
+
 /* ---- analog stick -> d-pad ------------------------------------------------ */
 static void stick_set(int dir, int active) {
     if (active == g_stick[dir]) return;

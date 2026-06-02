@@ -53,7 +53,9 @@ desktop.ini
 *.rms
 gameslot*_*.rms
 
-# Dev-menu runtime files (controls config, emulator save states)
+# Dev-menu runtime files (configs, save states, screenshots)
 controls.cfg
+settings.cfg
 savestate*.bin
 sstest.bin
+shot_*.bmp

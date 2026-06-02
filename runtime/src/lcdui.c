@@ -248,7 +248,12 @@ void m_javax_microedition_lcdui_Display__setCurrent__Ljavax_microedition_lcdui_D
     (void)this_;
     display_set_canvas(d);   /* route key events to this Canvas's keyPressed/Released */
 }
-jint m_javax_microedition_lcdui_Display__vibrate__I__Z(jref this_, jint ms) { (void)this_; (void)ms; return 1; }
+jint m_javax_microedition_lcdui_Display__vibrate__I__Z(jref this_, jint ms) {
+    (void)this_;
+    extern void devinput_rumble(int ms);   /* devinput.c: pad rumble */
+    devinput_rumble(ms);
+    return 1;
+}
 
 /* ===== Alert / AlertType =================================================== */
 void m_javax_microedition_lcdui_Alert___init___Ljava_lang_String__V(jref this_, jref s) { (void)this_; (void)s; }

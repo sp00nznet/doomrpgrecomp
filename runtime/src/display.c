@@ -132,7 +132,16 @@ void display_pump(void) {
     while (SDL_PollEvent(&e)) {
         devgui_process_event(&e);             /* ImGui sees every event first */
         if (e.type == SDL_QUIT) { g_quit = 1; continue; }
-        if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) { g_quit = 1; continue; }
+        if (e.type == SDL_KEYDOWN && !e.key.repeat) {   /* host hotkeys */
+            switch (e.key.keysym.sym) {
+                case SDLK_ESCAPE: g_quit = 1; continue;
+                case SDLK_F5:  devgui_quicksave();         continue;
+                case SDLK_F9:  devgui_quickload();         continue;
+                case SDLK_F11: devgui_toggle_fullscreen(); continue;
+                case SDLK_F12: devgui_request_screenshot();continue;
+                default: break;
+            }
+        }
         /* real keyboard + controller input -> rebindable bindings (devinput) */
         devinput_process_event(&e, devgui_capture_keyboard());
     }

@@ -17,6 +17,7 @@ extern "C" {
 
 void devinput_init(void);
 void devinput_shutdown(void);
+void devinput_rumble(int ms);   /* game vibrate() -> controller rumble */
 
 /* Feed every SDL event. Returns 1 if the event was consumed as game input
  * (so the host should not treat it further). kbd_blocked = 1 when ImGui owns

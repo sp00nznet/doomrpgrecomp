@@ -47,6 +47,16 @@ int  devgui_should_present(void);
  * Must be called between game frames (from runtime_idle), NOT inside a flush. */
 void devgui_run_pending(void);
 
+/* hotkey actions (display.c binds F-keys to these) */
+void devgui_quicksave(void);          /* save state slot 0 */
+void devgui_quickload(void);          /* load state slot 0 */
+void devgui_request_screenshot(void); /* dump the window to shot_NNN.bmp */
+void devgui_toggle_fullscreen(void);
+
+/* controller menu-navigation toggle (Start button) */
+int  devgui_menu_nav(void);
+void devgui_toggle_menu_nav(void);
+
 void devgui_shutdown(void);
 
 #ifdef __cplusplus

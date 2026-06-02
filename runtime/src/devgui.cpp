@@ -20,6 +20,7 @@
 #include "imgui_impl_sdlrenderer2.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* ---- the recompiled game's native state (C linkage; defined in generated/) ---
  * Ordinary globals emitted by the translator; jint is int32_t == int here. */
@@ -95,6 +96,45 @@ static void apply_scale(int s) {
     if (g_win) SDL_SetWindowSize(g_win, w, h);
 }
 
+/* persist graphics + audio choices to settings.cfg (controls.cfg holds bindings) */
+static int    g_settings_dirty = 0;
+static Uint32 g_settings_saved = 0;
+static void   mark_settings_dirty(void) { g_settings_dirty = 1; }
+
+static void settings_save(void) {
+    FILE *f = fopen("settings.cfg", "w");
+    if (!f) return;
+    fprintf(f, "scale %d\nfilter %d\nscanlines %d\nmaster %d\nmusic %d\nmute %d\n",
+            g_scale, g_filter, g_scanlines ? 1 : 0,
+            devaudio_get_master(), devaudio_get_music(), devaudio_get_mute());
+    fclose(f);
+}
+static void settings_load(void) {
+    FILE *f = fopen("settings.cfg", "r");
+    if (!f) return;
+    char k[32]; int v;
+    while (fscanf(f, "%31s %d", k, &v) == 2) {
+        if      (!strcmp(k, "scale"))     apply_scale(v);
+        else if (!strcmp(k, "filter"))    g_filter = v;
+        else if (!strcmp(k, "scanlines")) g_scanlines = v != 0;
+        else if (!strcmp(k, "master"))    devaudio_set_master(v);
+        else if (!strcmp(k, "music"))     devaudio_set_music(v);
+        else if (!strcmp(k, "mute"))      devaudio_set_mute(v);
+    }
+    fclose(f);
+}
+
+/* ---- hotkey actions (display.c maps F-keys to these) ---------------------- */
+static bool g_shot_pending = false;
+extern "C" void devgui_request_screenshot(void) { g_shot_pending = true; }
+extern "C" void devgui_quicksave(void) { queue(P_SS_SAVE, 0); }
+extern "C" void devgui_quickload(void) { queue(P_SS_LOAD, 0); }
+extern "C" void devgui_toggle_fullscreen(void) {
+    if (!g_win) return;
+    Uint32 fl = SDL_GetWindowFlags(g_win);
+    SDL_SetWindowFullscreen(g_win, (fl & SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
+}
+
 int devgui_bar_height(void) { return g_bar_h; }
 
 void devgui_init(SDL_Window *win, SDL_Renderer *ren, int game_w, int game_h, int scale)
@@ -111,6 +151,7 @@ void devgui_init(SDL_Window *win, SDL_Renderer *ren, int game_w, int game_h, int
     ImGui_ImplSDL2_InitForSDLRenderer(win, ren);
     ImGui_ImplSDLRenderer2_Init(ren);
     devaudio_init();
+    settings_load();              /* restore graphics/audio prefs from last run */
 }
 
 void devgui_process_event(const SDL_Event *e)
@@ -229,26 +270,26 @@ static void build_bar(void)
         if (ImGui::BeginMenu("Graphics")) {
             int sc = g_scale;
             ImGui::SetNextItemWidth(140);
-            if (ImGui::SliderInt("Scale", &sc, 1, 8)) apply_scale(sc);
+            if (ImGui::SliderInt("Scale", &sc, 1, 8)) { apply_scale(sc); mark_settings_dirty(); }
             ImGui::Separator();
             ImGui::TextDisabled("Filter");
-            if (ImGui::RadioButton("Nearest (crisp)", g_filter == 0)) g_filter = 0;
-            if (ImGui::RadioButton("Linear (smooth)", g_filter == 1)) g_filter = 1;
+            if (ImGui::RadioButton("Nearest (crisp)", g_filter == 0)) { g_filter = 0; mark_settings_dirty(); }
+            if (ImGui::RadioButton("Linear (smooth)", g_filter == 1)) { g_filter = 1; mark_settings_dirty(); }
             ImGui::Separator();
-            ImGui::Checkbox("Scanlines", &g_scanlines);
+            if (ImGui::Checkbox("Scanlines", &g_scanlines)) mark_settings_dirty();
             ImGui::EndMenu();
         }
 
         /* ---- Audio: volumes ---------------------------------------------- */
         if (ImGui::BeginMenu("Audio")) {
             bool mute = devaudio_get_mute() != 0;
-            if (ImGui::Checkbox("Mute", &mute)) devaudio_set_mute(mute);
+            if (ImGui::Checkbox("Mute", &mute)) { devaudio_set_mute(mute); mark_settings_dirty(); }
             int master = devaudio_get_master();
             ImGui::SetNextItemWidth(160);
-            if (ImGui::SliderInt("Master", &master, 0, 100)) devaudio_set_master(master);
+            if (ImGui::SliderInt("Master", &master, 0, 100)) { devaudio_set_master(master); mark_settings_dirty(); }
             int music = devaudio_get_music();
             ImGui::SetNextItemWidth(160);
-            if (ImGui::SliderInt("Music", &music, 0, 100)) devaudio_set_music(music);
+            if (ImGui::SliderInt("Music", &music, 0, 100)) { devaudio_set_music(music); mark_settings_dirty(); }
             ImGui::EndMenu();
         }
 
@@ -332,6 +373,10 @@ void devgui_present(SDL_Texture *game_tex)
     if (g_menu_nav) io.ConfigFlags |=  ImGuiConfigFlags_NavEnableGamepad;
     else            io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
 
+    if (g_settings_dirty && SDL_GetTicks() - g_settings_saved > 800) {  /* debounce slider drags */
+        settings_save(); g_settings_dirty = 0; g_settings_saved = SDL_GetTicks();
+    }
+
     ImGui_ImplSDLRenderer2_NewFrame();
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
@@ -379,6 +424,22 @@ void devgui_present(SDL_Texture *game_tex)
         }
         free(px);
     }
+
+    if (g_shot_pending) {            /* F12 screenshot -> next free shot_NNN.bmp */
+        int ow = 0, oh = 0; SDL_GetRendererOutputSize(g_ren, &ow, &oh);
+        SDL_Surface *s = SDL_CreateRGBSurfaceWithFormat(0, ow, oh, 32, SDL_PIXELFORMAT_ARGB8888);
+        if (s && SDL_RenderReadPixels(g_ren, NULL, SDL_PIXELFORMAT_ARGB8888, s->pixels, s->pitch) == 0) {
+            char name[64];
+            for (int i = 0; ; i++) {
+                snprintf(name, sizeof name, "shot_%03d.bmp", i);
+                FILE *t = fopen(name, "rb"); if (!t) break; fclose(t);
+            }
+            if (SDL_SaveBMP(s, name) == 0) snprintf(g_msg, sizeof g_msg, "saved %s", name);
+        }
+        if (s) SDL_FreeSurface(s);
+        g_shot_pending = false;
+    }
+
     SDL_RenderPresent(g_ren);
     g_in_present = 0;
 }
