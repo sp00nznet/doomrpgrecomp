@@ -17,6 +17,8 @@ extern "C" {
 int  devkeypad_is_open(void);
 void devkeypad_toggle(void);
 void devkeypad_close(void);
+void devkeypad_open(void);
+void devkeypad_auto(int game_state);   /* open at the code prompt, close on leave */
 void devkeypad_move(int dx, int dy);   /* move the highlight (wraps) */
 void devkeypad_press(void);            /* enter the highlighted key */
 void devkeypad_press_index(int i);     /* enter key i directly (mouse click) */

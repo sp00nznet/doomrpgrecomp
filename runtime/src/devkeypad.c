@@ -18,6 +18,18 @@ static int g_cur  = 0;
 int  devkeypad_is_open(void) { return g_open; }
 void devkeypad_toggle(void)  { g_open = !g_open; }
 void devkeypad_close(void)   { g_open = 0; }
+void devkeypad_open(void)    { g_open = 1; }
+
+/* The game's door/puzzle code prompt is state 6 (m_k.d handles its digit entry).
+ * Auto-open the keypad when we enter it, auto-close when we leave -- so a pad
+ * player gets the on-screen pad exactly when a code is asked for. */
+#define CODE_STATE 6
+void devkeypad_auto(int game_state) {
+    static int prev = -1;
+    if (game_state == CODE_STATE && prev != CODE_STATE)      g_open = 1;
+    else if (game_state != CODE_STATE && prev == CODE_STATE) g_open = 0;
+    prev = game_state;
+}
 
 void devkeypad_move(int dx, int dy) {
     int c = g_cur % 3 + dx, r = g_cur / 3 + dy;

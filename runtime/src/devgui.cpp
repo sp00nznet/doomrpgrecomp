@@ -368,6 +368,7 @@ void devgui_present(SDL_Texture *game_tex)
     g_in_present = 1;
     g_last_present = SDL_GetTicks();
     cheats_per_frame();                 /* enforce pinned cheats (godmode, etc.) */
+    devkeypad_auto(cheats_get_state()); /* pop the keypad at a door-code prompt */
 
     ImGuiIO &io = ImGui::GetIO();        /* toggle gamepad nav for this frame */
     if (g_menu_nav) io.ConfigFlags |=  ImGuiConfigFlags_NavEnableGamepad;
