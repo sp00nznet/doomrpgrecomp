@@ -36,6 +36,10 @@ jint m_java_io_InputStream__read__aBII__I(jref this_, jref arr, jint off, jint l
     s->pos += n;
     return n;
 }
+jint m_java_io_InputStream__read__aB__I(jref this_, jref arr) {
+    ArrayObj *a = (ArrayObj *)arr;
+    return m_java_io_InputStream__read__aBII__I(this_, arr, 0, a ? a->length : 0);
+}
 jlong m_java_io_InputStream__skip__J__J(jref this_, jlong n) {
     StreamObj *s = (StreamObj *)this_;
     jlong avail = s->len - s->pos; if (n > avail) n = avail;
@@ -58,6 +62,20 @@ jint m_java_io_DataInputStream__read____I(jref this_) {
     StreamObj *s = dis_src(this_);
     if (s->pos >= s->len) return -1;
     return s->buf[s->pos++];
+}
+jint m_java_io_DataInputStream__readUnsignedByte____I(jref this_) { return dis_u8(this_) & 0xFF; }
+jint m_java_io_DataInputStream__readChar____C(jref this_) {
+    int hi = dis_u8(this_), lo = dis_u8(this_);
+    return (jint)(jchar)((hi << 8) | lo);
+}
+void m_java_io_DataInputStream__close____V(jref this_) { (void)this_; }
+void m_java_io_DataInputStream__readFully__aBII__V(jref this_, jref arr, jint off, jint len) {
+    StreamObj *s = dis_src(this_);
+    uint8_t *dst = (uint8_t *)J_ARRDATA(arr) + off;
+    for (jint i = 0; i < len; i++) {
+        if (s->pos >= s->len) { j_throw_class(&CLASS_java_io_IOException, "EOF"); return; }
+        dst[i] = s->buf[s->pos++];
+    }
 }
 jint m_java_io_DataInputStream__readByte____B(jref this_) { return (jint)(jbyte)dis_u8(this_); }
 jint m_java_io_DataInputStream__readBoolean____Z(jref this_) { return dis_u8(this_) != 0; }
@@ -109,6 +127,13 @@ jref m_java_io_ByteArrayOutputStream__toByteArray____aB(jref this_) {
     memcpy(J_ARRDATA(arr), s->buf, (size_t)s->len);
     return arr;
 }
+void m_java_io_ByteArrayOutputStream__write__I__V(jref this_, jint b) { baos_put((StreamObj *)this_, b & 0xFF); }
+void m_java_io_ByteArrayOutputStream__write__aBII__V(jref this_, jref arr, jint off, jint len) {
+    StreamObj *s = (StreamObj *)this_;
+    const uint8_t *src = (const uint8_t *)J_ARRDATA(arr) + off;
+    for (jint i = 0; i < len; i++) baos_put(s, src[i]);
+}
+void m_java_io_ByteArrayOutputStream__close____V(jref this_) { (void)this_; }
 
 void m_java_io_DataOutputStream___init___Ljava_io_OutputStream__V(jref this_, jref out) {
     ((StreamObj *)this_)->wrapped = out;
@@ -128,6 +153,16 @@ void m_java_io_DataOutputStream__writeLong__J__V(jref this_, jlong v) {
     StreamObj *d = dos_dst(this_);
     for (int i = 7; i >= 0; i--) baos_put(d, (int)((v >> (i * 8)) & 0xFF));
 }
+void m_java_io_DataOutputStream__writeChar__I__V(jref this_, jint v) {
+    StreamObj *d = dos_dst(this_); baos_put(d, (v >> 8) & 0xFF); baos_put(d, v & 0xFF);
+}
+void m_java_io_DataOutputStream__write__I__V(jref this_, jint b) { baos_put(dos_dst(this_), b & 0xFF); }
+void m_java_io_DataOutputStream__write__aBII__V(jref this_, jref arr, jint off, jint len) {
+    StreamObj *d = dos_dst(this_);
+    const uint8_t *src = (const uint8_t *)J_ARRDATA(arr) + off;
+    for (jint i = 0; i < len; i++) baos_put(d, src[i]);
+}
+void m_java_io_DataOutputStream__close____V(jref this_) { (void)this_; }
 void m_java_io_DataOutputStream__writeUTF__Ljava_lang_String__V(jref this_, jref str) {
     StreamObj *d = dos_dst(this_);
     char *u = j_string_to_cstr(str);
@@ -142,5 +177,11 @@ void m_java_io_PrintStream__println__Ljava_lang_String__V(jref this_, jref s) {
     (void)this_;
     char *c = j_string_to_cstr(s);
     printf("%s\n", c);
+    free(c);
+}
+void m_java_io_PrintStream__print__Ljava_lang_String__V(jref this_, jref s) {
+    (void)this_;
+    char *c = j_string_to_cstr(s);
+    printf("%s", c);
     free(c);
 }

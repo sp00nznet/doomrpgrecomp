@@ -137,6 +137,15 @@ class _MethodGen:
         pc = 0
         for op, operands, length in opcodes.iterate(code):
             name = opcodes.NAME.get(op, "??0x%02x" % op)
+            if name == "wide":
+                # iterate() yields ("wide", inner_op, index[, const]). Rewrite to
+                # the inner instruction carrying a 16-bit local index, so the
+                # normal load/store/iinc paths handle it with no special-casing.
+                # operands[2:] is (index,) for loads/stores/ret -- matching "u1" --
+                # and (index, const) for iinc -- matching "u1u1".
+                op = operands[1]
+                name = opcodes.NAME[op]
+                operands = tuple(operands[2:])
             self.instrs.append((pc, op, name, operands, length))
             self.pc_index[pc] = len(self.instrs) - 1
             pc += length
@@ -425,6 +434,14 @@ class _MethodGen:
         out.append("}")
         return "\n".join(out)
 
+    def _clinit_guard(self, owner):
+        """Emit `j_clinit_<owner>();` before an active use of an own class that
+        has a <clinit> -- lazy init matching JVM semantics. Returns None if no
+        guard is needed (runtime class, or no static initializer)."""
+        if self.prog.is_own(owner) and self.prog.classes[owner].has_clinit:
+            return "j_clinit_%s();" % mangle.cls(owner)
+        return None
+
     # -- the big per-opcode generator --------------------------------------
     def gen(self, pc, name, operands, length):
         st = self.in_state[pc]
@@ -573,11 +590,15 @@ class _MethodGen:
             owner, fname, desc = self.cp.ref(operands[0])
             g, _own = self.prog.static_field_member(owner, fname, desc)
             self.cg.note_static(owner, fname, desc, _storage_ctype(desc))
+            guard = self._clinit_guard(owner)
+            if guard: emit(guard)
             emit("%s = %s;" % (S(h, type_tag(desc)), g)); return
         if name == "putstatic":
             owner, fname, desc = self.cp.ref(operands[0])
             g, _own = self.prog.static_field_member(owner, fname, desc)
             self.cg.note_static(owner, fname, desc, _storage_ctype(desc))
+            guard = self._clinit_guard(owner)
+            if guard: emit(guard)
             emit("%s = %s;" % (g, S(h - 1, type_tag(desc)))); return
         if name == "getfield":
             owner, fname, desc = self.cp.ref(operands[0])
@@ -597,6 +618,8 @@ class _MethodGen:
         # object / array creation
         if name == "new":
             cn = self.cp.class_name(operands[0]); self.cg.note_class(cn)
+            guard = self._clinit_guard(cn)
+            if guard: emit(guard)
             emit("%s = j_new(&%s);" % (S(h, "a"), mangle.class_descriptor(cn))); return
         if name == "newarray":
             atype = operands[0]
@@ -685,6 +708,11 @@ class _MethodGen:
 
         self.cg.note_method(owner, mname, desc, is_static)
         ret_c = comp_ctype(ret)
+
+        if is_static:
+            guard = self._clinit_guard(owner)
+            if guard:
+                self.emit(guard)
 
         if name in ("invokestatic", "invokespecial"):
             fn = mangle.method(owner, mname, desc)
@@ -815,7 +843,9 @@ def _cstr(s: str) -> str:
         elif 0x20 <= o < 0x7F:
             out.append(ch)
         else:
+            # Octal, not \xNN: C hex escapes are greedy, so "\x99" + 'a' would be
+            # read as one (out-of-range) escape \x99a. Octal is capped at 3 digits.
             for b in ch.encode("utf-8"):
-                out.append("\\x%02x" % b)
+                out.append("\\%03o" % b)
     out.append('"')
     return "".join(out)

@@ -36,9 +36,9 @@ game/extracted/
 # ...except the README screenshot of our own running build:
 !docs/screenshot.png
 
-# Generated C is reproducible from the JAR -- regenerate with the recompiler
-generated/*.c
-generated/*.h
+# Generated C is reproducible from the JAR -- regenerate with the recompiler.
+# Per-game output lives in generated/<game>/, so ignore the whole tree.
+generated/
 
 # IDE / OS
 .vscode/

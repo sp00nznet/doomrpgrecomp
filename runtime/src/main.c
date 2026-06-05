@@ -51,6 +51,8 @@ static char *find_assets(const char *arg) {
 }
 
 int main(int argc, char *argv[]) {
+    void install_crash_handler(void);     /* crashdump.c */
+    install_crash_handler();
     setvbuf(stdout, NULL, _IONBF, 0);     /* see progress even if we abort */
     int scale = (argc > 2) ? atoi(argv[2]) : 4;
     if (scale < 1) scale = 1;
@@ -59,11 +61,12 @@ int main(int argc, char *argv[]) {
     const char *assets_dir = find_assets(argc > 1 ? argv[1] : NULL);
     if (!assets_dir) {
         fprintf(stderr,
-            "Doom RPG (recomp): could not find the game assets.\n"
-            "Extract your legally-obtained DoomRPG.jar into a folder, then either\n"
-            "run from the project root (where game\\extracted lives) or pass the\n"
-            "folder explicitly:\n"
-            "    DoomRPG.exe <extracted-jar-folder> [scale]\n");
+            "%s (recomp): could not find the game assets.\n"
+            "Extract your legally-obtained JAR into a folder, then either run from\n"
+            "the project root (where game\\extracted lives) or pass the folder\n"
+            "explicitly:\n"
+            "    <exe> <extracted-jar-folder> [scale]\n",
+            g_game_name ? g_game_name : "game");
         return 1;
     }
     printf("doomrpgrecomp -- assets: %s, scale: %dx\n", assets_dir, scale);
@@ -76,10 +79,9 @@ int main(int argc, char *argv[]) {
     runtime_init_statics();
     j_init_all();                         /* run all <clinit> */
 
-    /* MIDlet lifecycle */
-    jref app = j_new(&CLASS_DoomRPG);
-    m_DoomRPG___init_____V(app);
-    m_DoomRPG__startApp____V(app);
+    /* MIDlet lifecycle -- new <MIDlet>(); startApp(), via the generated,
+     * per-game entry shim so this host stays game-agnostic. */
+    game_run();
 
     /* If startApp returned without an inline loop, keep the window responsive. */
     while (!g_quit_requested && !display_should_quit()) {

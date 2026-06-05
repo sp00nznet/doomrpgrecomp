@@ -196,14 +196,12 @@ jdouble*j_darr(jref a, jint i)  { return (jdouble*)elem_ptr(a, i, 8); }
 /* ---- exceptions ----------------------------------------------------------- */
 static j_eh *g_eh_top = NULL;
 
-int j_try(j_eh *frame) {
+/* Bookkeeping half of the j_try macro (jvm.h). setjmp itself runs in the
+ * generated method's frame (the macro), so longjmp lands in a live frame. */
+void j_push_eh(j_eh *frame) {
     frame->prev = g_eh_top;
     frame->ex = NULL;
     g_eh_top = frame;
-    /* setjmp is invoked by the caller via the macro? No -- we do it here so the
-     * generated code stays simple: it calls `if (j_try(&_eh)) { ... }`. */
-    int v = setjmp(frame->env);
-    return v;   /* 0 first time, 1 after a throw landed here */
 }
 
 void j_pop_eh(void) {

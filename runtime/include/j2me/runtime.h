@@ -148,6 +148,16 @@ int    assets_open(const char *jar_or_dir);
 int    assets_probe(const char *dir);                 /* 1 if dir holds extracted assets */
 uint8_t *assets_get(const char *name, int *out_len);  /* borrowed bytes, or NULL */
 
+/* ---- per-game entry shim (generated game_entry.c) -------------------------- */
+/* One host runtime drives every supported game; these decouple it from any one
+ * game's MIDlet symbols and screen size. game_entry.c (emitted per game by the
+ * recompiler) defines them. */
+extern int g_screen_w, g_screen_h;          /* native Canvas size for this game */
+extern const char *g_game_name;             /* window title */
+extern const char *g_asset_marker;          /* file assets_probe() looks for */
+extern const char *const g_manifest[];      /* MANIFEST.MF k,v pairs, 0-terminated */
+void   game_run(void);                       /* new <MIDlet>(); startApp() */
+
 /* ---- display / input (SDL2) ----------------------------------------------- */
 int    display_init(int w, int h, int scale);
 void   display_present(const uint32_t *argb /* w*h */);
@@ -158,13 +168,14 @@ int    display_last_keycode(void);
 void   display_shutdown(void);
 void   display_set_canvas(jref canvas);    /* current Canvas; receives key events */
 
-/* Native game screen size (the phone's full-screen Canvas). The game renders a
- * 128x128 first-person/menu view and reserves a ~22px HUD strip below it: it
- * derives the view height as canvasHeight-22, so a 150px-tall canvas yields the
- * 128px view the engine hardcodes (it centers 128x128 boxes on the view centre,
- * so a shorter canvas clips the top). 128 wide matches every shipped asset. */
-#define SCREEN_W 128
-#define SCREEN_H 150
+/* Native game screen size. Now per-game (g_screen_w/g_screen_h, set by the
+ * generated game_entry.c); these macros keep existing call sites unchanged.
+ * For the original Doom RPG it is 128x150: the engine renders a 128x128
+ * first-person/menu view and reserves a ~22px HUD strip below it (view height =
+ * canvasHeight-22), so a 150px-tall canvas yields the 128px view it hardcodes.
+ * Other titles in the family use their own native phone resolution. */
+#define SCREEN_W (g_screen_w)
+#define SCREEN_H (g_screen_h)
 
 /* ---- audio (winmm MIDI) ---------------------------------------------------- */
 void   midi_init(void);

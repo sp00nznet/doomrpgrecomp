@@ -100,6 +100,46 @@ void m_java_lang_String___init___aCII__V(jref this_, jref a0, jint off, jint len
     memcpy(s->chars, src + off, (size_t)len * sizeof(jchar));
 }
 
+/* new String(byte[], off, len) -- decode the byte range as (modified) UTF-8,
+ * which also covers the ASCII the games actually store. */
+void m_java_lang_String___init___aBII__V(jref this_, jref a0, jint off, jint len) {
+    StringObj *s = (StringObj *)this_;
+    const char *src = (const char *)J_ARRDATA(a0) + off;
+    jref tmp = j_string_from_utf8(src, len);
+    StringObj *t = (StringObj *)tmp;
+    s->length = t->length;
+    s->chars = t->chars;     /* arena-allocated; safe to alias */
+}
+/* new String(byte[], off, len, charset) -- we always treat bytes as UTF-8. */
+void m_java_lang_String___init___aBIILjava_lang_String__V(jref this_, jref a0, jint off, jint len, jref charset) {
+    (void)charset;
+    m_java_lang_String___init___aBII__V(this_, a0, off, len);
+}
+/* new String(char[]) */
+void m_java_lang_String___init___aC__V(jref this_, jref a0) {
+    StringObj *s = (StringObj *)this_;
+    ArrayObj *a = (ArrayObj *)a0;
+    jint n = a ? a->length : 0;
+    s->length = n;
+    s->chars = (jchar *)j_alloc((size_t)(n > 0 ? n : 1) * sizeof(jchar));
+    if (n) memcpy(s->chars, J_ARRDATA(a0), (size_t)n * sizeof(jchar));
+}
+/* new String(StringBuffer) */
+void m_java_lang_String___init___Ljava_lang_StringBuffer__V(jref this_, jref sb) {
+    StringObj *s = (StringObj *)this_;
+    StringBufferObj *b = (StringBufferObj *)sb;
+    jint n = b ? b->length : 0;
+    s->length = n;
+    s->chars = (jchar *)j_alloc((size_t)(n > 0 ? n : 1) * sizeof(jchar));
+    if (n) memcpy(s->chars, b->chars, (size_t)n * sizeof(jchar));
+}
+jref m_java_lang_String__valueOf__I__Ljava_lang_String(jint v) {
+    char b[16]; snprintf(b, sizeof b, "%d", v); return j_string_from_utf8(b, -1);
+}
+jint m_java_lang_String__indexOf__I__I(jref this_, jint ch) {
+    return m_java_lang_String__indexOf__II__I(this_, ch, 0);
+}
+
 jint m_java_lang_String__charAt__I__C(jref this_, jint i) {
     StringObj *s = (StringObj *)this_;
     if ((uint32_t)i >= (uint32_t)s->length) { J_AIOOBE(i); return 0; }
@@ -167,6 +207,28 @@ jref m_java_lang_String__valueOf__C__Ljava_lang_String(jint c) {
     return j_string_from_chars(&ch, 1);
 }
 
+jref m_java_lang_String__toLowerCase____Ljava_lang_String(jref this_) {
+    StringObj *s = (StringObj *)this_;
+    jref r = j_string_from_chars(s->chars, s->length);
+    StringObj *o = (StringObj *)r;
+    for (jint i = 0; i < o->length; i++) { jchar c = o->chars[i]; if (c >= 'A' && c <= 'Z') o->chars[i] = c + 32; }
+    return r;
+}
+jref m_java_lang_String__toUpperCase____Ljava_lang_String(jref this_) {
+    StringObj *s = (StringObj *)this_;
+    jref r = j_string_from_chars(s->chars, s->length);
+    StringObj *o = (StringObj *)r;
+    for (jint i = 0; i < o->length; i++) { jchar c = o->chars[i]; if (c >= 'a' && c <= 'z') o->chars[i] = c - 32; }
+    return r;
+}
+jref m_java_lang_String__trim____Ljava_lang_String(jref this_) {
+    StringObj *s = (StringObj *)this_;
+    jint b = 0, e = s->length;
+    while (b < e && s->chars[b] <= ' ') b++;
+    while (e > b && s->chars[e - 1] <= ' ') e--;
+    return j_string_from_chars(s->chars + b, e - b);
+}
+
 /* ===========================================================================
  * java.lang.StringBuffer
  * =========================================================================== */
@@ -220,6 +282,19 @@ jref m_java_lang_StringBuffer__append__J__Ljava_lang_StringBuffer(jref this_, jl
     jref s = j_string_from_utf8(buf, -1); sb_append_str((StringBufferObj *)this_, s); return this_;
 }
 
+jref m_java_lang_StringBuffer__append__aC__Ljava_lang_StringBuffer(jref this_, jref arr) {
+    ArrayObj *a = (ArrayObj *)arr;
+    if (a) sb_append_chars((StringBufferObj *)this_, (jchar *)J_ARRDATA(arr), a->length);
+    return this_;
+}
+jref m_java_lang_StringBuffer__deleteCharAt__I__Ljava_lang_StringBuffer(jref this_, jint i) {
+    StringBufferObj *b = (StringBufferObj *)this_;
+    if (i >= 0 && i < b->length) {
+        memmove(b->chars + i, b->chars + i + 1, (size_t)(b->length - i - 1) * sizeof(jchar));
+        b->length--;
+    }
+    return this_;
+}
 jint m_java_lang_StringBuffer__charAt__I__C(jref this_, jint i) {
     StringBufferObj *b = (StringBufferObj *)this_;
     if ((uint32_t)i >= (uint32_t)b->length) { J_AIOOBE(i); return 0; }

@@ -20,11 +20,14 @@ int assets_open(const char *dir) {
     return 0;
 }
 
-/* Does `dir` look like an extracted DoomRPG.jar? (checks for a known entry) */
+/* Does `dir` look like an extracted game JAR? Checks for a known entry: the
+ * per-game marker from the entry shim (the MIDlet's .class, always present),
+ * falling back to "intro.bsp" for safety. */
 int assets_probe(const char *dir) {
     if (!dir || !*dir) return 0;
+    const char *marker = (g_asset_marker && *g_asset_marker) ? g_asset_marker : "intro.bsp";
     char path[1100];
-    snprintf(path, sizeof path, "%s/%s", dir, "intro.bsp");
+    snprintf(path, sizeof path, "%s/%s", dir, marker);
     FILE *f = fopen(path, "rb");
     if (!f) return 0;
     fclose(f);

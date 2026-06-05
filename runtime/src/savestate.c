@@ -17,6 +17,18 @@
 #define SS_MAGIC   0x53535244u   /* 'DRSS' little-endian */
 #define SS_VERSION 1u
 
+/* Discovery aid: print every int static's current value. Diff a "menu" snapshot
+ * against an "in-game" one to find a game's state/stat globals. */
+void dbg_dump_int_statics(const char *tag) {
+    fprintf(stderr, "=== int statics [%s] ===\n", tag ? tag : "");
+    for (int i = 0; i < g_static_info_count; i++) {
+        const StaticInfo *s = &g_static_info[i];
+        if (s->is_int && s->size == 4)
+            fprintf(stderr, "%s = %d\n", s->name, *(int *)s->addr);
+    }
+    fflush(stderr);
+}
+
 int savestate_exists(const char *path) {
     FILE *f = fopen(path, "rb");
     if (!f) return 0;

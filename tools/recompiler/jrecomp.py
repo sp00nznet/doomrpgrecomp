@@ -116,6 +116,115 @@ def cmd_info(args) -> int:
     return 0 if not unknown_ops else 1
 
 
+def _read_manifest_pairs(jar_path: str) -> list[tuple[str, str]]:
+    """Parse META-INF/MANIFEST.MF into a list of (key, value) attribute pairs
+    (continuation lines unfolded). Empty if absent/unreadable."""
+    try:
+        with zipfile.ZipFile(jar_path) as z:
+            raw = z.read("META-INF/MANIFEST.MF").decode("utf-8", "replace")
+    except (KeyError, OSError):
+        return []
+    lines = []
+    for ln in raw.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        if ln[:1] == " " and lines:          # leading space continues previous
+            lines[-1] += ln[1:]
+        else:
+            lines.append(ln)
+    pairs = []
+    for ln in lines:
+        if ":" in ln:
+            k, v = ln.split(":", 1)
+            k = k.strip()
+            if k:
+                pairs.append((k, v.strip()))
+    return pairs
+
+
+def _read_manifest_entry(jar_path: str) -> str | None:
+    """Return the MIDlet-1 main class as an internal name (dots -> slashes)."""
+    for k, v in _read_manifest_pairs(jar_path):
+        if k.lower() == "midlet-1":
+            parts = v.split(",")           # "<name>, <icon>, <class>"
+            if len(parts) >= 3:
+                return parts[2].strip().replace(".", "/")
+    return None
+
+
+def _baseline_path() -> str:
+    import os
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "runtime_baseline.json")
+
+
+def _merge_baseline(cg) -> int:
+    """Fold the runtime-surface baseline (union of every game's runtime
+    references) into this game's Codegen, so the generated header always
+    declares the FULL set of runtime symbols that the hand-written runtime
+    (class_meta.c, jvm_core.c, ...) references -- not just this game's subset.
+    Returns how many entries were added, or -1 if no baseline file exists."""
+    import os, json
+    p = _baseline_path()
+    if not os.path.exists(p):
+        return -1
+    with open(p, encoding="utf-8") as f:
+        b = json.load(f)
+    n = 0
+    for owner, name, desc, is_static in b.get("methods", []):
+        key = (owner, name, desc, bool(is_static))
+        if key not in cg.ext_methods:
+            cg.ext_methods.add(key); n += 1
+    for cn in b.get("classes", []):
+        if cn not in cg.ext_classes:
+            cg.ext_classes.add(cn); n += 1
+    for owner, name, desc, cstore in b.get("statics", []):
+        if (owner, name, desc) not in cg.ext_statics:
+            cg.ext_statics[(owner, name, desc)] = cstore; n += 1
+    return n
+
+
+def _populate_cg(jar):
+    """Load a jar and translate every method, returning (prog, cg) with all
+    external runtime references accumulated. Bodies are discarded."""
+    import layout, translate
+    prog = layout.load_program(jar)
+    cg = translate.Codegen(prog)
+    for cname in sorted(prog.classes):
+        for ml in prog.classes[cname].methods:
+            if ml.code is not None:
+                translate.translate_method(cg, prog.classes[cname], ml)
+    return prog, cg
+
+
+def cmd_baseline(args) -> int:
+    """Build runtime_baseline.json from the union of several games' runtime
+    references. Every method registered in class_meta.c is used by at least one
+    game, so this union == the full runtime surface every game's header must
+    declare. Regenerate this whenever the runtime's J2ME surface changes."""
+    import json
+    methods, classes, statics = set(), set(), {}
+    for jar in args.jars:
+        _prog, cg = _populate_cg(jar)
+        methods |= cg.ext_methods
+        classes |= cg.ext_classes
+        for k, v in cg.ext_statics.items():
+            statics[k] = v
+        print("  + %s: %d methods, %d classes, %d statics" %
+              (jar, len(cg.ext_methods), len(cg.ext_classes), len(cg.ext_statics)))
+    b = {
+        "_comment": "Union of every supported game's runtime references == the "
+                    "full runtime surface. Regenerate with: jrecomp baseline <jars...>",
+        "methods": sorted([list(m) for m in methods]),
+        "classes": sorted(classes),
+        "statics": sorted([[o, n, d, s] for (o, n, d), s in statics.items()]),
+    }
+    with open(_baseline_path(), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(b, f, indent=1)
+        f.write("\n")
+    print("wrote %s: %d methods, %d classes, %d statics (from %d jars)" %
+          (_baseline_path(), len(methods), len(classes), len(statics), len(args.jars)))
+    return 0
+
+
 def cmd_translate(args) -> int:
     import os
     import layout
@@ -126,6 +235,18 @@ def cmd_translate(args) -> int:
     prog = layout.load_program(args.jar)
     cg = translate.Codegen(prog)
     os.makedirs(args.out, exist_ok=True)
+
+    # Resolve the MIDlet entry class (explicit --entry wins, else the manifest).
+    entry = args.entry or _read_manifest_entry(args.jar)
+    if entry and not prog.is_own(entry):
+        print("warning: entry class %r not among recompiled classes" % entry)
+    # Screen dimensions for the generated entry shim ("WxH").
+    sw, sh = 128, 150
+    if args.screen:
+        try:
+            sw, sh = (int(v) for v in args.screen.lower().split("x", 1))
+        except ValueError:
+            print("error: --screen must be WxH, e.g. 352x416"); return 2
 
     # 1) translate every method body, collecting external references.
     per_class_bodies: dict[str, list[str]] = {}
@@ -143,7 +264,13 @@ def cmd_translate(args) -> int:
         per_class_bodies[cname] = bodies
 
     # 2) aggregate header: types, own class metadata + statics + protos, and
-    #    extern decls for every runtime symbol the game references.
+    #    extern decls for every runtime symbol referenced. Fold in the runtime
+    #    baseline so the header declares the full runtime surface (class_meta.c
+    #    et al. reference all of it, regardless of what this game uses).
+    added = _merge_baseline(cg)
+    if added < 0:
+        print("warning: no runtime_baseline.json -- header will only declare "
+              "this game's runtime subset (run: jrecomp baseline <jars...>)")
     _emit_header(args.out, prog, cg, method_protos)
 
     # 3) one .c per class.
@@ -153,9 +280,16 @@ def cmd_translate(args) -> int:
     # 4) init unit (runs every <clinit>).
     _emit_init_c(args.out, prog)
 
-    n_files = len(prog.classes) + 2
+    # 5) entry shim: decouples the host main.c from this game's MIDlet symbols,
+    #    screen size, and JAD/manifest properties (so one runtime drives every
+    #    game).
+    _emit_entry_c(args.out, prog, entry, sw, sh, args.name,
+                  _read_manifest_pairs(args.jar))
+
+    n_files = len(prog.classes) + 3
     print("translated %d classes, %d methods with code -> %d files in %s"
           % (len(prog.classes), n_methods, n_files, args.out))
+    print("entry MIDlet: %s   screen: %dx%d" % (entry or "(unknown)", sw, sh))
     print("external runtime symbols referenced: %d methods, %d classes, %d statics"
           % (len(cg.ext_methods), len(cg.ext_classes), len(cg.ext_statics)))
     return 0
@@ -179,6 +313,16 @@ def _emit_header(out, prog, cg, method_protos):
             runtime_classes.add(sup)
     for cname in sorted(runtime_classes):
         L.append("extern const jclass %s; /* runtime */" % mangle.class_descriptor(cname))
+
+    # Base-offset macro for every own class, so an own class may extend another
+    # own class (Doom RPG II has g->p, o->af, ...). J2ME_BASE_<cls> is where a
+    # subclass's own fields begin = this class's full instance size. Macros, so
+    # declaration order across the chain doesn't matter.
+    L.append("")
+    L.append("/* ---- own-class base offsets (enables own-extends-own) ---- */")
+    for cname in sorted(prog.classes):
+        L.append("#define J2ME_BASE_%s %s" %
+                 (mangle.cls(cname), prog.classes[cname].instance_size_expr))
 
     L.append("")
     L.append("/* ---- static fields (own) ---- */")
@@ -211,6 +355,11 @@ def _emit_header(out, prog, cg, method_protos):
                  (layout.comp_ctype(ret), fn, ", ".join(ps), owner, name, desc))
 
     L.append("")
+    L.append("/* ---- lazy class-init guards ---- */")
+    for cname in sorted(prog.classes):
+        if prog.classes[cname].has_clinit:
+            L.append("void j_clinit_%s(void);" % mangle.cls(cname))
+    L.append("")
     L.append("void j_init_all(void);")
     L.append("#endif")
     _write(out, "doomrpg.h", "\n".join(L) + "\n")
@@ -232,12 +381,15 @@ def _emit_class_c(out, prog, cname, bodies):
         L.append("")
     # method table for virtual/interface dispatch (instance, non-init methods)
     L.append("static const jmethod _methods_%s[] = {" % mangle.cls(cname))
-    entries = []
-    for ml in cl.methods:
-        if ml.is_static or ml.name in ("<init>", "<clinit>"):
-            continue
-        entries.append('    { %s, %s, (void*)&%s },' %
-                        (_cq(ml.name), _cq(ml.desc), ml.cfn))
+    # Only methods with a body go in the dispatch table. Abstract methods (no
+    # Code) have no C definition; a concrete subclass supplies the override that
+    # j_vfind finds by walking the super chain, so listing the abstract entry
+    # would just reference an undefined symbol.
+    table = [ml for ml in cl.methods
+             if not ml.is_static and ml.name not in ("<init>", "<clinit>")
+             and ml.code is not None]
+    entries = ['    { %s, %s, (void*)&%s },' % (_cq(ml.name), _cq(ml.desc), ml.cfn)
+               for ml in table]
     L.extend(entries if entries else ["    { 0, 0, 0 },"])
     L.append("};")
     # jclass metadata
@@ -245,8 +397,7 @@ def _emit_class_c(out, prog, cname, bodies):
     sup_ref = ("&%s" % mangle.class_descriptor(sup)) if sup else "0"
     L.append("const jclass %s = {" % mangle.class_descriptor(cname))
     L.append('    %s, %s, %s,' % (_cq(cname), sup_ref, cl.instance_size_expr))
-    L.append("    _methods_%s, %d," % (mangle.cls(cname),
-             len([m for m in cl.methods if not m.is_static and m.name not in ("<init>", "<clinit>")])))
+    L.append("    _methods_%s, %d," % (mangle.cls(cname), len(table)))
     L.append("    0, 0,        /* interfaces (TODO) */")
     L.append("    0, 0         /* element, prim */")
     L.append("};")
@@ -255,13 +406,68 @@ def _emit_class_c(out, prog, cname, bodies):
 
 def _emit_init_c(out, prog):
     import mangle
-    L = ['/* GENERATED by jrecomp -- static initializers */',
-         '#include "doomrpg.h"', "", "void j_init_all(void) {"]
+    # Lazy class init (JVM semantics): each class's <clinit> runs on first active
+    # use (new / static field access / static call), guarded by j_clinit_<cls>().
+    # Eager init-all was wrong: e.g. one game's class <clinit> reads the App
+    # singleton, which only exists after new App() runs.
+    L = ['/* GENERATED by jrecomp -- lazy static initializers */',
+         '#include "doomrpg.h"', ""]
     for cname in sorted(prog.classes):
-        if prog.classes[cname].has_clinit:
-            L.append("    %s();" % mangle.method(cname, "<clinit>", "()V"))
-    L.append("}")
+        cl = prog.classes[cname]
+        if not cl.has_clinit:
+            continue
+        L.append("void j_clinit_%s(void) {" % mangle.cls(cname))
+        L.append("    static char done; if (done) return; done = 1;")
+        sup = cl.super_internal
+        if sup and prog.is_own(sup) and prog.classes[sup].has_clinit:
+            L.append("    j_clinit_%s();   /* superclass first */" % mangle.cls(sup))
+        L.append("    %s();" % mangle.method(cname, "<clinit>", "()V"))
+        L.append("}")
+    L.append("")
+    L.append("/* Classes now initialize lazily; kept for the host's call site. */")
+    L.append("void j_init_all(void) { }")
     _write(out, "_init.c", "\n".join(L) + "\n")
+
+
+def _emit_entry_c(out, prog, entry, screen_w, screen_h, game_name, manifest):
+    """Generate game_entry.c -- the seam between the shared host runtime and this
+    particular game: screen size, window title, asset-probe marker, the JAD/
+    manifest properties (MIDlet.getAppProperty), and a game_run() that
+    constructs+starts the game's MIDlet by its real symbol."""
+    import mangle
+    name = game_name or (entry or "Game")
+    L = ['/* GENERATED by jrecomp -- per-game entry shim. */',
+         '#include "doomrpg.h"', "",
+         "/* Native screen size (host display + GameCanvas framebuffer). */",
+         "int g_screen_w = %d;" % screen_w,
+         "int g_screen_h = %d;" % screen_h,
+         'const char *g_game_name = %s;' % _cq(name),
+         "",
+         "/* assets_probe() looks for this file to recognise an extracted JAR. */",
+         'const char *g_asset_marker = %s;' % _cq((entry + ".class") if entry else "intro.bsp"),
+         "",
+         "/* MANIFEST.MF attributes, served by MIDlet.getAppProperty(). */",
+         "const char *const g_manifest[] = {"]
+    for k, v in manifest:
+        L.append("    %s, %s," % (_cq(k), _cq(v)))
+    L.append("    0, 0")
+    L.append("};")
+    L.append("")
+    if entry and prog.is_own(entry):
+        init_fn = mangle.method(entry, "<init>", "()V")
+        start_fn = mangle.method(entry, "startApp", "()V")
+        guard = ("    j_clinit_%s();\n" % mangle.cls(entry)) if prog.classes[entry].has_clinit else ""
+        L += ["/* MIDlet lifecycle: new %s(); startApp(). */" % entry,
+              "void game_run(void) {",
+              guard + "    jref app = j_new(&%s);" % mangle.class_descriptor(entry),
+              "    %s(app);" % init_fn,
+              "    %s(app);" % start_fn,
+              "}"]
+    else:
+        L += ["/* No usable MIDlet entry found at recompile time; host keeps the",
+              "   window alive via its fallback pump loop. */",
+              "void game_run(void) { }"]
+    _write(out, "game_entry.c", "\n".join(L) + "\n")
 
 
 def _safe(cname):
@@ -290,10 +496,18 @@ def main(argv=None) -> int:
     pi.add_argument("--api", action="store_true", help="show external API references")
     pi.set_defaults(func=cmd_info)
 
-    pt = sub.add_parser("translate", help="emit C (coming soon)")
+    pt = sub.add_parser("translate", help="emit C")
     pt.add_argument("jar")
     pt.add_argument("-o", "--out", required=True)
+    pt.add_argument("--screen", help="native screen size WxH (e.g. 352x416)")
+    pt.add_argument("--name", help="display name for the window title")
+    pt.add_argument("--entry", help="entry MIDlet class (default: from MANIFEST.MF)")
     pt.set_defaults(func=cmd_translate)
+
+    pb = sub.add_parser("baseline",
+                        help="(re)build runtime_baseline.json from several jars")
+    pb.add_argument("jars", nargs="+")
+    pb.set_defaults(func=cmd_baseline)
 
     # The Windows console defaults to cp1252; force UTF-8 so box-drawing and
     # any non-ASCII identifiers print cleanly.

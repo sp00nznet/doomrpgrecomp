@@ -119,7 +119,12 @@ typedef struct j_eh {
     jref          ex;
 } j_eh;
 
-int   j_try(j_eh *frame);            /* push frame; returns setjmp() value */
+/* j_try MUST be a macro: setjmp has to run in the *caller's* stack frame (the
+ * generated method), not in a helper -- otherwise longjmp restores a frame that
+ * has already returned (corruption / /GS failure). j_push_eh does the bookkeeping
+ * then setjmp captures the right frame. Generated code uses `if (j_try(&_eh))`. */
+void  j_push_eh(j_eh *frame);        /* install frame on the handler stack */
+#define j_try(frame) (j_push_eh(frame), setjmp((frame)->env))
 void  j_pop_eh(void);                /* pop the top frame (normal exit) */
 void  j_throw(jref ex);              /* set current exception, longjmp to top frame */
 void  j_rethrow(jref ex);            /* pop current frame then propagate */

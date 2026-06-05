@@ -47,12 +47,29 @@ void m_javax_microedition_media_Player__close____V(jref this_) {
 jint m_javax_microedition_media_Player__getState____I(jref this_) {
     return ((PlayerObj *)this_)->state;
 }
+void m_javax_microedition_media_Player__stop____V(jref this_) {
+    PlayerObj *p = (PlayerObj *)this_;
+    if (p->midi) midi_stop(p->midi);
+    p->state = STATE_REALIZED;
+}
+void m_javax_microedition_media_Player__prefetch____V(jref this_) {
+    ((PlayerObj *)this_)->state = STATE_REALIZED;
+}
+void m_javax_microedition_media_Player__deallocate____V(jref this_) {
+    PlayerObj *p = (PlayerObj *)this_;
+    if (p->midi) midi_stop(p->midi);
+    p->state = STATE_REALIZED;
+}
 jref m_javax_microedition_media_Controllable__getControl__Ljava_lang_String__Ljavax_microedition_media_Control(
         jref this_, jref name) {
     (void)name; return this_;   /* the player is its own VolumeControl (see above) */
 }
 jint m_javax_microedition_media_control_VolumeControl__setLevel__I__I(jref this_, jint level) {
     (void)this_; return level;  /* TODO: MCI volume */
+}
+/* No event thread, so we never fire callbacks; accept and ignore listeners. */
+void m_javax_microedition_media_Player__addPlayerListener__Ljavax_microedition_media_PlayerListener__V(jref this_, jref l) {
+    (void)this_; (void)l;
 }
 
 /* ===========================================================================

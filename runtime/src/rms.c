@@ -55,9 +55,19 @@ static void rms_save(RecordStoreObj *s) {
 
 jref m_javax_microedition_rms_RecordStore__openRecordStore__Ljava_lang_StringZ__Ljavax_microedition_rms_RecordStore(
         jref name, jint createIfNecessary) {
-    (void)createIfNecessary;
-    RecordStoreObj *s = (RecordStoreObj *)j_new(&CLASS_javax_microedition_rms_RecordStore);
     char *n = j_string_to_cstr(name);
+    char path[128]; rms_path(n, path, sizeof path);
+    FILE *probe = fopen(path, "rb");
+    if (probe) fclose(probe);
+    /* MIDP: opening a non-existent store with createIfNecessary=false throws
+     * RecordStoreNotFoundException -- games catch this to detect "no save yet".
+     * Returning an empty store instead makes them read garbage and crash. */
+    if (!probe && !createIfNecessary) {
+        free(n);
+        j_throw_class(&CLASS_javax_microedition_rms_RecordStoreNotFoundException, "record store not found");
+        return 0;
+    }
+    RecordStoreObj *s = (RecordStoreObj *)j_new(&CLASS_javax_microedition_rms_RecordStore);
     snprintf(s->name, sizeof s->name, "%s", n);
     free(n);
     s->next_id = 1;

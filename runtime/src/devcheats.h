@@ -37,6 +37,15 @@ const char *cheats_level_name(int i);
 void        cheats_warp(int i);
 void        cheats_new_game(void);
 
+/* engine's built-in debug menu (uniform across all games): inject a key code
+ * sequence (e.g. "3666") into the game's input. */
+void        cheats_send_code(const char *digits);
+
+/* built-in debug-counters overlay flag (per-game; absent -> not available) */
+int         cheats_has_debug_flag(void);
+int         cheats_get_debug_flag(void);
+void        cheats_set_debug_flag(int v);
+
 #ifdef __cplusplus
 }
 #endif

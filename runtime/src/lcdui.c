@@ -65,6 +65,37 @@ jint m_javax_microedition_lcdui_Graphics__getClipY____I(jref this_) { return ((G
 jint m_javax_microedition_lcdui_Graphics__getClipWidth____I(jref this_) { return ((GraphicsObj *)this_)->cw; }
 jint m_javax_microedition_lcdui_Graphics__getClipHeight____I(jref this_) { return ((GraphicsObj *)this_)->ch; }
 
+/* clipRect intersects the new rect with the current clip (MIDP semantics). */
+void m_javax_microedition_lcdui_Graphics__clipRect__IIII__V(jref this_, jint x, jint y, jint w, jint h) {
+    GraphicsObj *g = (GraphicsObj *)this_;
+    jint x0 = g->cx > x ? g->cx : x, y0 = g->cy > y ? g->cy : y;
+    jint x1 = (g->cx + g->cw) < (x + w) ? (g->cx + g->cw) : (x + w);
+    jint y1 = (g->cy + g->ch) < (y + h) ? (g->cy + g->ch) : (y + h);
+    g->cx = x0; g->cy = y0; g->cw = x1 > x0 ? x1 - x0 : 0; g->ch = y1 > y0 ? y1 - y0 : 0;
+}
+jint m_javax_microedition_lcdui_Graphics__getColor____I(jref this_) {
+    return (jint)(((GraphicsObj *)this_)->color & 0xFFFFFF);
+}
+void m_javax_microedition_lcdui_Graphics__setColor__III__V(jref this_, jint r, jint g, jint b) {
+    ((GraphicsObj *)this_)->color = 0xFF000000u | (((uint32_t)r & 0xFF) << 16) |
+                                    (((uint32_t)g & 0xFF) << 8) | ((uint32_t)b & 0xFF);
+}
+/* fillArc: approximate as a filled ellipse over the bounding box (the arc
+ * sweep is ignored -- good enough for the round HUD elements that use it). */
+void m_javax_microedition_lcdui_Graphics__fillArc__IIIIII__V(jref this_, jint x, jint y, jint w, jint h, jint sa, jint aa) {
+    GraphicsObj *g = (GraphicsObj *)this_; (void)sa; (void)aa;
+    jint rx = w / 2, ry = h / 2; if (rx <= 0 || ry <= 0) return;
+    jint cx = x + rx, cy = y + ry;
+    for (jint j = -ry; j <= ry; j++) for (jint i = -rx; i <= rx; i++)
+        if ((long)i * i * ry * ry + (long)j * j * rx * rx <= (long)rx * rx * ry * ry)
+            plot(g, cx + i, cy + j, g->color);
+}
+
+/* Non-static blit helper so other runtime units (nokia.c) can draw into a
+ * Graphics honoring its translate + clip. */
+void j_gfx_plot(jref gr, jint x, jint y, uint32_t argb) { plot((GraphicsObj *)gr, x, y, argb); }
+uint32_t j_gfx_color(jref gr) { return ((GraphicsObj *)gr)->color; }
+
 /* MIDP anchor bits (Graphics) and Sprite transform codes (Image.drawRegion). */
 enum { A_HCENTER = 1, A_VCENTER = 2, A_LEFT = 4, A_RIGHT = 8,
        A_TOP = 16, A_BOTTOM = 32, A_BASELINE = 64 };
@@ -159,8 +190,85 @@ jref m_javax_microedition_lcdui_Image__createImage__Ljava_lang_String__Ljavax_mi
     free(px);
     return img;
 }
+/* createImage(w,h): a blank MUTABLE image (MIDP starts it filled white). */
+jref m_javax_microedition_lcdui_Image__createImage__II__Ljavax_microedition_lcdui_Image(jint w, jint h) {
+    jref img = make_image(w, h);
+    ImageObj *im = (ImageObj *)img;
+    for (jint i = 0; i < w * h; i++) im->px[i] = 0xFFFFFFFFu;
+    return img;
+}
+/* createImage(byte[],off,len): decode a PNG held in a byte array. */
+jref m_javax_microedition_lcdui_Image__createImage__aBII__Ljavax_microedition_lcdui_Image(jref bytes, jint off, jint len) {
+    if (!bytes) return make_image(1, 1);
+    uint8_t *data = (uint8_t *)J_ARRDATA(bytes) + off;
+    int w = 0, h = 0;
+    uint32_t *px = png_decode(data, len, &w, &h);
+    if (!px) return make_image(1, 1);
+    jref img = make_image(w, h);
+    memcpy(((ImageObj *)img)->px, px, (size_t)w * h * sizeof(uint32_t));
+    free(px);
+    return img;
+}
+jref m_javax_microedition_lcdui_Image__getGraphics____Ljavax_microedition_lcdui_Graphics(jref this_) {
+    ImageObj *im = (ImageObj *)this_;
+    return make_graphics(im->px, im->w, im->h);   /* draw straight into the image */
+}
+jint m_javax_microedition_lcdui_Image__getWidth____I(jref this_)  { return ((ImageObj *)this_)->w; }
+jint m_javax_microedition_lcdui_Image__getHeight____I(jref this_) { return ((ImageObj *)this_)->h; }
+void m_javax_microedition_lcdui_Image__getRGB__aIIIIIII__V(
+        jref this_, jref rgb, jint off, jint scan, jint x, jint y, jint w, jint h) {
+    ImageObj *im = (ImageObj *)this_;
+    jint *dst = (jint *)J_ARRDATA(rgb);
+    for (jint j = 0; j < h; j++) for (jint i = 0; i < w; i++) {
+        jint sxx = x + i, syy = y + j;
+        uint32_t p = (sxx >= 0 && syy >= 0 && sxx < im->w && syy < im->h) ? im->px[syy * im->w + sxx] : 0;
+        dst[off + j * scan + i] = (jint)p;
+    }
+}
 
 /* ===== Canvas ============================================================== */
+/* Plain Canvas (not GameCanvas): allocate a paint() framebuffer + Graphics. */
+void m_javax_microedition_lcdui_Canvas___init_____V(jref this_) {
+    CanvasObj *c = (CanvasObj *)this_;
+    c->base.width = g_screen_w; c->base.height = g_screen_h;
+    c->offscreen = j_alloc((size_t)g_screen_w * g_screen_h * sizeof(uint32_t));
+    c->graphics = (struct jobject *)make_graphics((uint32_t *)c->offscreen, g_screen_w, g_screen_h);
+}
+/* repaint/serviceRepaints: synchronously call the subclass paint(g), then push
+ * the framebuffer to SDL (our model is single-threaded + cooperative). */
+static void canvas_paint_present(jref this_) {
+    CanvasObj *c = (CanvasObj *)this_;
+    if (!c->offscreen) return;
+    typedef void (*pfn)(jref, jref);
+    pfn paint = (pfn)j_vfind_opt(this_->cls, "paint", "(Ljavax/microedition/lcdui/Graphics;)V");
+    if (paint && c->graphics) paint(this_, (jref)c->graphics);
+    display_present((const uint32_t *)c->offscreen);
+    display_pump();
+    /* Optional headless capture: DOOMRPG_DUMPDIR -> every Nth frame as PPM (the
+     * GameCanvas path has the same hook; Canvas-based games use this one). */
+    const char *dumpdir = getenv("DOOMRPG_DUMPDIR");
+    if (dumpdir) {
+        static int sf = 0, sw = 0;
+        const char *sn = getenv("DOOMRPG_DUMPN"); int stride = sn ? atoi(sn) : 8;
+        if (stride < 1) stride = 1;
+        if ((sf++ % stride) == 0 && sw < 400) {
+            char path[512]; snprintf(path, sizeof path, "%s/frame%05d.ppm", dumpdir, sw++);
+            FILE *f = fopen(path, "wb");
+            if (f) {
+                const uint32_t *fb = (const uint32_t *)c->offscreen;
+                fprintf(f, "P6\n%d %d\n255\n", g_screen_w, g_screen_h);
+                for (int i = 0; i < g_screen_w * g_screen_h; i++)
+                    { uint32_t p = fb[i]; fputc((p>>16)&0xFF,f); fputc((p>>8)&0xFF,f); fputc(p&0xFF,f); }
+                fclose(f);
+            }
+        }
+    }
+}
+void m_javax_microedition_lcdui_Canvas__repaint____V(jref this_)        { canvas_paint_present(this_); }
+void m_javax_microedition_lcdui_Canvas__serviceRepaints____V(jref this_){ canvas_paint_present(this_); }
+jint m_javax_microedition_lcdui_Canvas__getWidth____I(jref this_)  { return ((CanvasObj *)this_)->base.width; }
+jint m_javax_microedition_lcdui_Canvas__getHeight____I(jref this_) { return ((CanvasObj *)this_)->base.height; }
+jint m_javax_microedition_lcdui_Displayable__isShown____Z(jref this_) { (void)this_; return 1; }
 void m_javax_microedition_lcdui_Canvas__setFullScreenMode__Z__V(jref this_, jint full) {
     (void)this_; (void)full;
 }
@@ -190,6 +298,18 @@ void m_javax_microedition_lcdui_game_GameCanvas___init___Z__V(jref this_, jint s
 }
 jref m_javax_microedition_lcdui_game_GameCanvas__getGraphics____Ljavax_microedition_lcdui_Graphics(jref this_) {
     return (jref)((GameCanvasObj *)this_)->graphics;
+}
+/* GameCanvas-named key helpers (Orcs & Elves II super-calls these). */
+jint m_javax_microedition_lcdui_game_GameCanvas__getGameAction__I__I(jref this_, jint key) {
+    return m_javax_microedition_lcdui_Canvas__getGameAction__I__I(this_, key);
+}
+jint m_javax_microedition_lcdui_game_GameCanvas__getKeyCode__I__I(jref this_, jint action) {
+    (void)this_;
+    switch (action) { case 1: return -1; case 6: return -2; case 2: return -3;
+                      case 5: return -4; case 8: return -5; default: return 0; }
+}
+jref m_javax_microedition_lcdui_game_GameCanvas__getKeyName__I__Ljava_lang_String(jref this_, jint key) {
+    (void)this_; (void)key; return j_strlit("KEY");
 }
 void m_javax_microedition_lcdui_game_GameCanvas__flushGraphics____V(jref this_) {
     GameCanvasObj *gc = (GameCanvasObj *)this_;

@@ -1,0 +1,49 @@
+{
+  "_comment": "Game registry for doomrpgrecomp's multi-game build. One row per supported J2ME title (all share the id/Fountainhead engine). build.ps1 -Game <key> selects a row; the recompiler bakes screenW/H into the generated entry shim. 'entry' is optional -- if omitted the recompiler reads MIDlet-1 from the JAR's MANIFEST.MF. Paths are relative to the repo root. JARs are gitignored; bring your own legally-obtained copies into game/.",
+  "default": "DoomRPG",
+  "games": {
+    "DoomRPG": {
+      "jar": "game/DoomRPG.jar",
+      "name": "Doom RPG",
+      "screenW": 128,
+      "screenH": 150,
+      "exe": "DoomRPG",
+      "profile": "DoomRPG"
+    },
+    "DoomIIRPG": {
+      "jar": "game/doom-rpg-ii-352x416.jar",
+      "name": "Doom II RPG",
+      "screenW": 352,
+      "screenH": 416,
+      "exe": "DoomIIRPG"
+    },
+    "DoomIIRPG-SE": {
+      "jar": "game/doom_ii_rpg_240x320_SE.jar",
+      "name": "Doom II RPG SE",
+      "screenW": 240,
+      "screenH": 320,
+      "exe": "DoomIIRPG-SE"
+    },
+    "WolfRPG": {
+      "jar": "game/wolfenstein_rpg_240x320.jar",
+      "name": "Wolfenstein RPG",
+      "screenW": 240,
+      "screenH": 320,
+      "exe": "WolfRPG"
+    },
+    "OrcsElves": {
+      "jar": "game/orcs_and_elves_240x320.jar",
+      "name": "Orcs and Elves",
+      "screenW": 240,
+      "screenH": 320,
+      "exe": "OrcsElves"
+    },
+    "OrcsElves2": {
+      "jar": "game/orcs_and_elves_ii_128x160_240x320.jar",
+      "name": "Orcs & Elves II",
+      "screenW": 240,
+      "screenH": 320,
+      "exe": "OrcsElves2"
+    }
+  }
+}

@@ -22,14 +22,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ---- the recompiled game's native state (C linkage; defined in generated/) ---
- * Ordinary globals emitted by the translator; jint is int32_t == int here. */
-extern "C" {
-    extern int S_k__f__Z;   /* the game's own debug overlay (ms/li/sp/nd counters) */
-}
-
-static bool g_show_demo = false;
-
 /* Controller menu navigation: when on, ImGui reads the pad for nav and the game
  * is frozen out (devinput swallows the pad). Toggled by Start (see devinput.c). */
 static bool g_menu_nav = false;
@@ -170,7 +162,11 @@ static void build_bar(void)
 
         /* ---- File: new game + save states -------------------------------- */
         if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("New Game")) queue(P_NEWGAME, 0);
+            /* "New Game" warps via the per-game profile's level table; only games
+             * with a decoded profile (e.g. Doom RPG) support it. Greyed out
+             * otherwise -- use the engine's own menu (or 3-6-6-6) on those. */
+            bool can_new = cheats_level_count() > 0;
+            if (ImGui::MenuItem("New Game", nullptr, false, can_new)) queue(P_NEWGAME, 0);
             ImGui::Separator();
             ImGui::SetNextItemWidth(120);
             ImGui::SliderInt("Slot", &g_slot, 1, 9);
@@ -260,9 +256,14 @@ static void build_bar(void)
                 ImGui::EndMenu();
             }
             ImGui::Separator();
-            bool dbg = S_k__f__Z != 0;
-            if (ImGui::MenuItem("Built-in debug counters", nullptr, &dbg)) S_k__f__Z = dbg ? 1 : 0;
-            ImGui::MenuItem("ImGui demo window", nullptr, &g_show_demo);
+            /* The engine's own debug menu (God Mode, etc.) -- same on every id
+             * title: slowly press 3,6,6,6 at the title/pause screen. We inject
+             * that sequence; works for all games with no per-game RE. */
+            if (ImGui::MenuItem("Open built-in debug menu (3-6-6-6)")) cheats_send_code("3666");
+            if (cheats_has_debug_flag()) {
+                bool dbg = cheats_get_debug_flag() != 0;
+                if (ImGui::MenuItem("Built-in debug counters", nullptr, &dbg)) cheats_set_debug_flag(dbg ? 1 : 0);
+            }
             ImGui::EndMenu();
         }
 
@@ -339,8 +340,6 @@ static void build_bar(void)
 
         ImGui::EndMainMenuBar();
     }
-
-    if (g_show_demo) ImGui::ShowDemoWindow(&g_show_demo);
 
     /* On-screen numeric keypad for door/puzzle codes (controller or mouse). */
     if (devkeypad_is_open()) {

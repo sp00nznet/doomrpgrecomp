@@ -23,6 +23,14 @@ extern "C" {
 extern const SaveSlot g_savestate_statics[];
 extern const int      g_savestate_statics_count;
 
+/* named registry for the dev-menu static-discovery dump (savestate_registry.c) */
+typedef struct { const char *name; void *addr; unsigned size; int is_int; } StaticInfo;
+extern const StaticInfo g_static_info[];
+extern const int        g_static_info_count;
+/* dump current values of int statics to stderr; tag labels the snapshot. Used to
+ * reverse-engineer per-game state/stat globals (diff two snapshots). */
+void dbg_dump_int_statics(const char *tag);
+
 /* arena hooks (jvm_core.c) */
 unsigned char *j_arena_base(void);
 size_t         j_arena_used(void);

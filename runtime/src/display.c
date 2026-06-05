@@ -35,7 +35,9 @@ int display_init(int w, int h, int scale) {
     int win_w = w * scale;
     if (win_w < 480) win_w = 480;            /* room for the menu-bar titles */
     int win_h = devgui_bar_height() + h * scale;
-    g_win = SDL_CreateWindow("Doom RPG (recomp)",
+    char title[160];
+    snprintf(title, sizeof title, "%s (recomp)", g_game_name ? g_game_name : "game");
+    g_win = SDL_CreateWindow(title,
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         win_w, win_h, SDL_WINDOW_RESIZABLE);
     g_ren = SDL_CreateRenderer(g_win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
@@ -91,6 +93,7 @@ static SDL_Keycode name_to_sym(const char *s, int len) {
     if (!strncmp(s, "fire", len) && len == 4)  return SDLK_RETURN;
     if (!strncmp(s, "soft1", len) && len == 5) return SDLK_q;
     if (!strncmp(s, "soft2", len) && len == 5) return SDLK_w;
+    if (!strncmp(s, "f8", len) && len == 2)    return SDLK_F8;   /* dump int statics */
     if (len == 1 && s[0] >= '0' && s[0] <= '9') return SDLK_0 + (s[0] - '0');
     return 0;
 }
@@ -139,6 +142,8 @@ void display_pump(void) {
                 case SDLK_F9:  devgui_quickload();         continue;
                 case SDLK_F11: devgui_toggle_fullscreen(); continue;
                 case SDLK_F12: devgui_request_screenshot();continue;
+                case SDLK_F8: { void dbg_dump_int_statics(const char*);   /* RE aid */
+                               dbg_dump_int_statics("snap"); continue; }
                 default: break;
             }
         }

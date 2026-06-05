@@ -34,6 +34,11 @@ typedef struct DisplayableObj {
 typedef struct CanvasObj {
     DisplayableObj base;
     int            full_screen;
+    /* Plain-Canvas paint() path (Doom RPG II et al. -- not GameCanvas): the
+     * runtime owns a framebuffer + a Graphics bound to it; repaint() calls the
+     * subclass's paint(g) then presents. GameCanvas keeps its own pair below. */
+    void          *offscreen;
+    struct jobject *graphics;
 } CanvasObj;
 
 typedef struct GameCanvasObj {
@@ -42,6 +47,20 @@ typedef struct GameCanvasObj {
     struct jobject *graphics;    /* cached Graphics object bound to offscreen */
     int            key_state;    /* GameCanvas.getKeyStates() bitmask */
 } GameCanvasObj;
+
+/* javax.microedition.lcdui.Font -- the runtime renders all system text with one
+ * built-in 8x8 bitmap font, so a Font just remembers its requested attributes. */
+typedef struct FontObj {
+    struct jobject hdr;
+    int            face, style, size;
+} FontObj;
+
+/* com.nokia.mid.ui.DirectGraphics -- a thin wrapper over a Graphics (used by
+ * the Nokia-targeted ports, e.g. Doom RPG II, for 16-bit drawPixels blits). */
+typedef struct DirectGraphicsObj {
+    struct jobject hdr;
+    struct jobject *graphics;    /* the wrapped Graphics object */
+} DirectGraphicsObj;
 
 #define J2ME_BASE_javax_microedition_midlet_MIDlet \
     ((uint32_t)sizeof(MIDletObj))

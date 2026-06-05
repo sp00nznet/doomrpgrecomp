@@ -22,6 +22,12 @@ jint m_java_lang_Object__equals__Ljava_lang_Object__Z(jref this_, jref o) { retu
 jref m_java_lang_Object__toString____Ljava_lang_String(jref this_) {
     return j_string_from_utf8(this_ && this_->cls ? this_->cls->name : "null", -1);
 }
+/* Single-threaded cooperative model: there is no other thread to wait for or
+ * notify, so wait() just pumps the host once and returns; notify* are no-ops. */
+void m_java_lang_Object__wait____V(jref this_) { (void)this_; extern void runtime_idle(int); runtime_idle(0); }
+void m_java_lang_Object__wait__J__V(jref this_, jlong ms) { (void)this_; extern void runtime_idle(int); runtime_idle((int)ms); }
+void m_java_lang_Object__notify____V(jref this_) { (void)this_; }
+void m_java_lang_Object__notifyAll____V(jref this_) { (void)this_; }
 
 /* ===== Class =============================================================== */
 jref j_make_class_object(const jclass *target) {
@@ -51,6 +57,7 @@ jref m_java_lang_Class__getResourceAsStream__Ljava_lang_String__Ljava_io_InputSt
 void m_java_lang_Integer___init___I__V(jref this_, jint v) {
     ((IntegerObj *)this_)->value = v;
 }
+jint m_java_lang_Integer__intValue____I(jref this_) { return ((IntegerObj *)this_)->value; }
 jint m_java_lang_Integer__parseInt__Ljava_lang_String__I(jref s) {
     char *c = j_string_to_cstr(s);
     long v = strtol(c, 0, 10);
@@ -63,10 +70,18 @@ jref m_java_lang_Integer__toString__I__Ljava_lang_String(jint v) {
 jref m_java_lang_Long__toString__J__Ljava_lang_String(jlong v) {
     char b[32]; snprintf(b, sizeof b, "%lld", (long long)v); return j_string_from_utf8(b, -1);
 }
+jlong m_java_lang_Long__parseLong__Ljava_lang_String__J(jref s) {
+    char *c = j_string_to_cstr(s);
+    long long v = strtoll(c, 0, 10);
+    free(c);
+    return (jlong)v;
+}
 
 /* ===== Math ================================================================ */
 jint m_java_lang_Math__abs__I__I(jint a) { return a < 0 ? -a : a; }
 jint m_java_lang_Math__max__II__I(jint a, jint b) { return a > b ? a : b; }
+jint m_java_lang_Math__min__II__I(jint a, jint b) { return a < b ? a : b; }
+jlong m_java_lang_Math__abs__J__J(jlong a) { return a < 0 ? -a : a; }
 
 /* ===== System ============================================================== */
 void m_java_lang_System__arraycopy__Ljava_lang_ObjectILjava_lang_ObjectII__V(
@@ -92,7 +107,15 @@ jlong m_java_lang_System__currentTimeMillis____J(void) {
 void m_java_lang_System__gc____V(void) { /* no GC yet */ }
 
 jref m_java_lang_System__getProperty__Ljava_lang_String__Ljava_lang_String(jref key) {
-    (void)key; return 0;
+    char *k = j_string_to_cstr(key);
+    jref r = 0;
+    /* Games read microedition.locale and call .toLowerCase() on it -- return a
+     * real value so that (and similar) don't NPE. */
+    if (strcmp(k, "microedition.locale") == 0)        r = j_strlit("en-US");
+    else if (strcmp(k, "microedition.platform") == 0) r = j_strlit("doomrpgrecomp");
+    else if (strcmp(k, "microedition.encoding") == 0) r = j_strlit("UTF-8");
+    free(k);
+    return r;
 }
 
 /* ===== Runtime ============================================================= */
@@ -119,15 +142,34 @@ void m_java_lang_Thread__sleep__J__V(jlong ms) {
     extern void runtime_idle(int ms);   /* in main.c: pump events + sleep */
     runtime_idle((int)ms);
 }
+void m_java_lang_Thread__yield____V(void) {
+    extern void runtime_idle(int ms);
+    runtime_idle(0);                    /* cooperative: just pump events */
+}
+void m_java_lang_Thread__setPriority__I__V(jref this_, jint p) { (void)this_; (void)p; }
+void m_java_lang_Thread__join____V(jref this_) { (void)this_; /* runs inline; already done */ }
 
 /* ===== Throwable / Exception =============================================== */
 void m_java_lang_Exception___init___Ljava_lang_String__V(jref this_, jref msg) {
     ((ThrowableObj *)this_)->message = msg;
 }
+void m_java_lang_Exception___init_____V(jref this_) {
+    ((ThrowableObj *)this_)->message = 0;
+}
 jref m_java_lang_Throwable__toString____Ljava_lang_String(jref this_) {
     ThrowableObj *t = (ThrowableObj *)this_;
     if (t->message) return t->message;
     return j_string_from_utf8(this_->cls->name, -1);
+}
+void m_java_lang_Throwable__printStackTrace____V(jref this_) {
+    ThrowableObj *t = (ThrowableObj *)this_;
+    const char *cn = this_ && this_->cls ? this_->cls->name : "Throwable";
+    if (t && t->message) {
+        char *m = j_string_to_cstr(t->message);
+        fprintf(stderr, "%s: %s\n", cn, m); free(m);
+    } else {
+        fprintf(stderr, "%s\n", cn);
+    }
 }
 
 /* ===== java.util.Random ==================================================== */
