@@ -11,6 +11,7 @@
  *   per static: bytes[size]           in registry order
  */
 #include "savestate.h"
+#include "j2me/runtime.h"    /* jref / ArrayObj / jclass for the discovery dump */
 #include <stdio.h>
 #include <stdint.h>
 
@@ -22,16 +23,41 @@
  * an "in-game" one to find a game's state/stat globals. */
 void dbg_dump_int_statics(const char *tag) {
     FILE *f = fopen("statics_dump.txt", "a");
-    if (f) fprintf(f, "=== int statics [%s] ===\n", tag ? tag : "");
-    fprintf(stderr, "=== int statics [%s] ===\n", tag ? tag : "");
+    #define DEMIT(...) do { fprintf(stderr, __VA_ARGS__); if (f) fprintf(f, __VA_ARGS__); } while (0)
+    DEMIT("=== int statics [%s] ===\n", tag ? tag : "");
     for (int i = 0; i < g_static_info_count; i++) {
         const StaticInfo *s = &g_static_info[i];
-        if (s->is_int && s->size == 4) {
-            int v = *(int *)s->addr;
-            if (f) fprintf(f, "%s = %d\n", s->name, v);
-            fprintf(stderr, "%s = %d\n", s->name, v);
+        if (s->is_int && s->size == 4)
+            DEMIT("%s = %d\n", s->name, *(int *)s->addr);
+    }
+    /* Stats like health usually live in a heap object/array (not a scalar
+     * static), so also walk every reference static: dump array elements and the
+     * int-slots of plain objects. Diff two states to find e.g. HP 90 -> 80. */
+    DEMIT("--- ref statics (arrays + object int-fields) [%s] ---\n", tag ? tag : "");
+    for (int i = 0; i < g_static_info_count; i++) {
+        const StaticInfo *s = &g_static_info[i];
+        if (!s->is_ref) continue;
+        jref o = *(jref *)s->addr;
+        if (!o || !o->cls) continue;
+        if (o->cls->prim) {                       /* primitive array */
+            ArrayObj *a = (ArrayObj *)o;
+            int n = a->length; if (n < 0) n = 0; if (n > 96) n = 96;
+            const void *p = J_ARRDATA(a);
+            for (int k = 0; k < n; k++) {
+                int v;
+                if (a->atype == J_AT_I)      v = ((const int *)p)[k];
+                else if (a->atype == J_AT_S) v = ((const short *)p)[k];
+                else if (a->atype == J_AT_B) v = ((const signed char *)p)[k];
+                else break;                       /* non-numeric array: skip */
+                DEMIT("%s[%d] = %d\n", s->name, k, v);
+            }
+        } else {                                  /* plain object: int-aligned slots */
+            unsigned sz = o->cls->instance_size; if (sz > 4096) sz = 4096;
+            for (unsigned off = (unsigned)sizeof(jobject); off + 4 <= sz; off += 4)
+                DEMIT("%s@%u = %d\n", s->name, off, *(int *)((char *)o + off));
         }
     }
+    #undef DEMIT
     if (f) fclose(f);
     fflush(stderr);
 }

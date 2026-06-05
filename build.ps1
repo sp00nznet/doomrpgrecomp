@@ -80,7 +80,10 @@ cmd /c $compilecpp
 if ($LASTEXITCODE -ne 0) { throw "C++ compile failed" }
 
 Write-Host "[3/4] Linking $exe.exe ..."
-$link = "`"$vcvars`" >nul 2>&1 && link /nologo /DEBUG /SUBSYSTEM:CONSOLE /OUT:`"$exepath`" `"$objdir\*.obj`" `"$sdlLib\SDL2.lib`" `"$sdlLib\imgui.lib`" winmm.lib ole32.lib dbghelp.lib"
+# /STACK 256MB: the game's worker loop runs inline on the main thread, and level
+# load / rendering recurse deeply -- the default 1MB stack overflows (intermittent
+# crash that bypasses the SEH handler). Big reserve matches a J2ME thread's room.
+$link = "`"$vcvars`" >nul 2>&1 && link /nologo /DEBUG /MAP:`"build\$exe.map`" /STACK:0x10000000,0x100000 /SUBSYSTEM:CONSOLE /OUT:`"$exepath`" `"$objdir\*.obj`" `"$sdlLib\SDL2.lib`" `"$sdlLib\imgui.lib`" winmm.lib ole32.lib dbghelp.lib"
 cmd /c $link
 if ($LASTEXITCODE -ne 0) { throw "link failed" }
 

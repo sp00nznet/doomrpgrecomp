@@ -44,7 +44,7 @@ def main():
         "   jint scalars (the candidates for state/stat globals). */",
         "const StaticInfo g_static_info[] = {",
     ]
-    lines += [f'    {{ "{n}", &{n}, (unsigned)sizeof({n}), {1 if t == "jint" else 0} }},'
+    lines += [f'    {{ "{n}", &{n}, (unsigned)sizeof({n}), {1 if t == "jint" else 0}, {1 if t == "jref" else 0} }},'
               for n, t in ordered]
     lines += [
         "};",

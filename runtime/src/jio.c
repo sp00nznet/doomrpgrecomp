@@ -63,6 +63,14 @@ jint m_java_io_DataInputStream__read____I(jref this_) {
     if (s->pos >= s->len) return -1;
     return s->buf[s->pos++];
 }
+jint m_java_io_DataInputStream__read__aBII__I(jref this_, jref arr, jint off, jint len) {
+    StreamObj *s = dis_src(this_);
+    if (s->pos >= s->len) return -1;
+    jint n = s->len - s->pos; if (n > len) n = len;
+    memcpy((uint8_t *)J_ARRDATA(arr) + off, s->buf + s->pos, (size_t)n);
+    s->pos += n;
+    return n;
+}
 jint m_java_io_DataInputStream__readUnsignedByte____I(jref this_) { return dis_u8(this_) & 0xFF; }
 jint m_java_io_DataInputStream__readChar____C(jref this_) {
     int hi = dis_u8(this_), lo = dis_u8(this_);

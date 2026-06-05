@@ -39,6 +39,7 @@ jint m_javax_microedition_lcdui_Displayable__isShown____Z(jref);
 void m_com_nokia_mid_ui_DirectGraphics__drawPixels__aSZIIIIIIII__V(
     jref, jref, jint, jint, jint, jint, jint, jint, jint, jint, jint);
 jint m_java_io_InputStream__read__aB__I(jref, jref);
+jint m_java_io_DataInputStream__read__aBII__I(jref, jref, jint, jint);
 jint m_java_io_DataInputStream__readUnsignedByte____I(jref);
 void m_java_io_DataInputStream__close____V(jref);
 void m_java_io_ByteArrayOutputStream__write__I__V(jref, jint);
@@ -205,6 +206,7 @@ CLASS(CLASS_java_io_ByteArrayOutputStream, "java/io/ByteArrayOutputStream", &CLA
 
 static const jmethod T_DIS[] = {
     M("read", "()I", m_java_io_DataInputStream__read____I),
+    M("read", "([BII)I", m_java_io_DataInputStream__read__aBII__I),
     M("readByte", "()B", m_java_io_DataInputStream__readByte____B),
     M("readUnsignedByte", "()I", m_java_io_DataInputStream__readUnsignedByte____I),
     M("readBoolean", "()Z", m_java_io_DataInputStream__readBoolean____Z),

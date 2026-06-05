@@ -43,6 +43,9 @@ void *j_alloc(size_t n) {
     if (n == 0) n = 1;
     n = (n + 7u) & ~(size_t)7u;                 /* 8-byte align */
     if (g_arena_used + n > J_ARENA_CAP) {
+        char msg[96]; snprintf(msg, sizeof msg, "j_alloc out of memory (%zu bytes)", n);
+        extern void crash_log_message(const char *);
+        crash_log_message(msg);
         fprintf(stderr, "j_alloc: out of memory (%zu bytes)\n", n);
         abort();
     }
@@ -81,8 +84,12 @@ void *j_vfind_opt(const jclass *cls, const char *name, const char *desc) {
 void *j_vfind(const jclass *cls, const char *name, const char *desc) {
     void *fn = j_vfind_opt(cls, name, desc);
     if (!fn) {
-        fprintf(stderr, "j_vfind: %s.%s%s not found (abstract or runtime-only?)\n",
-                cls ? cls->name : "(null)", name, desc);
+        char msg[256];
+        snprintf(msg, sizeof msg, "j_vfind: %s.%s%s not found (unimplemented runtime method)",
+                 cls ? cls->name : "(null)", name, desc);
+        extern void crash_log_message(const char *);
+        crash_log_message(msg);
+        fprintf(stderr, "%s\n", msg);
         abort();
     }
     return fn;
@@ -212,6 +219,15 @@ void j_throw(jref ex) {
     j_eh *f = g_eh_top;
     if (!f) {
         const char *cn = (ex && ex->cls) ? ex->cls->name : "(unknown)";
+        /* No handler -> we're about to abort(), which bypasses the SEH crash
+         * handlers. Log the uncaught exception + a symbolized backtrace so the
+         * throwing generated method is recoverable. */
+        char msg[300];
+        char *m = (ex && ((ThrowableObj *)ex)->message) ? j_string_to_cstr(((ThrowableObj *)ex)->message) : 0;
+        snprintf(msg, sizeof msg, "uncaught %s%s%s", cn, m ? ": " : "", m ? m : "");
+        if (m) free(m);
+        extern void crash_log_message(const char *);
+        crash_log_message(msg);
         fprintf(stderr, "Uncaught exception: %s\n", cn);
         abort();
     }
