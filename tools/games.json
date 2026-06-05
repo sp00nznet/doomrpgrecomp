@@ -15,7 +15,8 @@
       "name": "Doom II RPG",
       "screenW": 352,
       "screenH": 416,
-      "exe": "DoomIIRPG"
+      "exe": "DoomIIRPG",
+      "profile": "DoomIIRPG"
     },
     "DoomIIRPG-SE": {
       "jar": "game/doom_ii_rpg_240x320_SE.jar",

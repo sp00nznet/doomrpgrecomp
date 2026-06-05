@@ -44,6 +44,17 @@ static void code_pump(void) {
     g_code_wait = 8;               /* ~8 frames between digits */
 }
 
+/* ---- stat array (HP) -- games that store stats in a short[] --------------- */
+static jshort *stat_hp_ptr(void) {
+    if (!g_profile.stat_array || g_profile.stat_hp < 0) return 0;
+    jref a = *g_profile.stat_array;
+    if (!a) return 0;
+    ArrayObj *o = (ArrayObj *)a;
+    if (g_profile.stat_hp >= o->length) return 0;
+    return (jshort *)J_ARRDATA(a) + g_profile.stat_hp;
+}
+static int stat_hp_cap(void) { return g_profile.stat_hp_cap ? g_profile.stat_hp_cap : 100; }
+
 /* ---- combat object (HP/armor) -------------------------------------------- */
 static jref combat(void) {
     return g_profile.combat_obj ? *g_profile.combat_obj : (jref)0;
@@ -79,15 +90,20 @@ void cheats_set_debug_flag(int v) { if (g_profile.debug_flag) *g_profile.debug_f
 void cheats_per_frame(void) {
     code_pump();                          /* drive any queued 3-6-6-6 sequence */
     if (g_cheat_godmode) {
-        int hpmax = t_geti(g_profile.m_hp_max);
-        if (hpmax > 0) t_seti(g_profile.m_hp_set, hpmax);
+        jshort *hp = stat_hp_ptr();
+        if (hp) {
+            if (*hp < stat_hp_cap()) *hp = (jshort)stat_hp_cap();   /* array-stat games */
+        } else {
+            int hpmax = t_geti(g_profile.m_hp_max);
+            if (hpmax > 0) t_seti(g_profile.m_hp_set, hpmax);
+        }
     }
     if (g_cheat_inf_ammo)
         for (int i = 0, n = ammo_n(); i < n; i++) ammo_set(i, ammo_cap());
 }
 
 /* ---- live readouts for the menu ------------------------------------------- */
-int cheats_get_health(void)  { return t_geti(g_profile.m_hp_get); }
+int cheats_get_health(void)  { jshort *hp = stat_hp_ptr(); return hp ? *hp : t_geti(g_profile.m_hp_get); }
 int cheats_get_armor(void)   { return t_geti(g_profile.m_armor_get); }
 int cheats_get_state(void)   { return g_profile.state   ? *g_profile.state   : -1; }
 int cheats_get_credits(void) { return g_profile.credits ? *g_profile.credits : -1; }
@@ -95,7 +111,7 @@ int cheats_ammo_count(void)  { return ammo_n(); }
 int cheats_ammo_get(int i)   { return ammo_get(i); }
 
 /* ---- give / set ----------------------------------------------------------- */
-void cheats_set_health(int v)  { t_seti(g_profile.m_hp_set, v); }
+void cheats_set_health(int v)  { jshort *hp = stat_hp_ptr(); if (hp) *hp = (jshort)v; else t_seti(g_profile.m_hp_set, v); }
 void cheats_set_armor(int v)   { t_seti(g_profile.m_armor_set, v); }
 void cheats_set_credits(int v) { if (g_profile.credits) *g_profile.credits = v; }
 void cheats_set_all_ammo(int v) { for (int i = 0, n = ammo_n(); i < n; i++) ammo_set(i, v); }

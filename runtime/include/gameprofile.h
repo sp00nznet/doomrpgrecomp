@@ -33,6 +33,13 @@ typedef struct GameProfile {
      * HP get/set share a name but differ by descriptor ("()I" vs "(I)V"). */
     const char *m_hp_get, *m_hp_set, *m_hp_max, *m_armor_get, *m_armor_set;
 
+    /* Alternative stat model: some games (e.g. Doom II RPG) keep stats in a
+     * short[] array rather than a combat object. If stat_array is non-NULL it
+     * takes precedence over combat_obj for HP. */
+    jref *stat_array;     /* short[] player stats */
+    int   stat_hp;        /* HP element index (-1 = none) */
+    int   stat_hp_cap;    /* godmode pin / give-HP target value */
+
     /* State transitions (static generated functions; NULL if unknown). */
     void (*set_state)(jint);
     void (*warp)(jref);          /* warp(levelNameString) */
