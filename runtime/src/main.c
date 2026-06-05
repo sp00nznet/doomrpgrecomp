@@ -21,7 +21,16 @@ void runtime_init_statics(void);          /* class_meta.c */
 void runtime_idle(int ms) {
     display_pump();
     devgui_run_pending();     /* run queued menu actions here, between game frames */
-    if (display_should_quit()) g_quit_requested = 1;
+    if (display_should_quit()) {
+        /* The game loop runs inline (inside startApp) and never returns, so a
+         * window-close / ESC / File-Quit can't unwind to main -- shut down and
+         * exit straight from here. RecordStore writes are flushed eagerly, so
+         * no save is lost. */
+        g_quit_requested = 1;
+        midi_shutdown();
+        display_shutdown();
+        exit(0);
+    }
     if (ms > 0) SDL_Delay((Uint32)ms);
 }
 

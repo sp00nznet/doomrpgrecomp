@@ -163,6 +163,7 @@ int    display_init(int w, int h, int scale);
 void   display_present(const uint32_t *argb /* w*h */);
 void   display_pump(void);                 /* process events; updates key state */
 int    display_should_quit(void);
+void   display_request_quit(void);         /* File->Quit / programmatic close */
 int    display_key_state(void);            /* GameCanvas bitmask */
 int    display_last_keycode(void);
 void   display_shutdown(void);

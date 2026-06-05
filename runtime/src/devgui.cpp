@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern "C" void display_request_quit(void);   /* display.c (File->Quit) */
+
 /* Controller menu navigation: when on, ImGui reads the pad for nav and the game
  * is frozen out (devinput swallows the pad). Toggled by Start (see devinput.c). */
 static bool g_menu_nav = false;
@@ -195,6 +197,8 @@ static void build_bar(void)
                 ImGui::EndMenu();
             }
             if (g_msg[0]) { ImGui::Separator(); ImGui::TextDisabled("%s", g_msg); }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Quit", "Esc")) display_request_quit();
             ImGui::EndMenu();
         }
 

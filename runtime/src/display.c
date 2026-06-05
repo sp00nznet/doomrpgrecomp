@@ -94,6 +94,7 @@ static SDL_Keycode name_to_sym(const char *s, int len) {
     if (!strncmp(s, "soft1", len) && len == 5) return SDLK_q;
     if (!strncmp(s, "soft2", len) && len == 5) return SDLK_w;
     if (!strncmp(s, "f8", len) && len == 2)    return SDLK_F8;   /* dump int statics */
+    if (!strncmp(s, "esc", len) && len == 3)   return SDLK_ESCAPE;
     if (len == 1 && s[0] >= '0' && s[0] <= '9') return SDLK_0 + (s[0] - '0');
     return 0;
 }
@@ -157,6 +158,7 @@ void display_pump(void) {
     if (g_tex && devgui_should_present()) devgui_present(g_tex);
 }
 
+void display_request_quit(void) { g_quit = 1; }
 int  display_should_quit(void) { return g_quit; }
 int  display_key_state(void)   { return g_keystate; }
 int  display_last_keycode(void){ return g_lastkey; }
