@@ -16,7 +16,14 @@
 #include <stdint.h>
 
 #define SS_MAGIC   0x53535244u   /* 'DRSS' little-endian */
-#define SS_VERSION 1u
+#define SS_VERSION 2u
+
+/* Snapshotted objects store cls pointers into the exe's data section, so a save
+ * is only loadable when the exe is at the exact same address with the same layout
+ * (same build, same load base). The address of this anchor symbol captures both:
+ * if it differs, the snapshot's cls pointers would be stale -> refuse the load. */
+extern const jclass CLASS_java_lang_Object;
+static uint64_t ss_anchor(void) { return (uint64_t)(uintptr_t)&CLASS_java_lang_Object; }
 
 /* Discovery aid (dev menu / F8): append every int static's current value to
  * statics_dump.txt (next to the exe) and stderr. Diff a "menu" snapshot against
@@ -76,6 +83,7 @@ int savestate_save(const char *path) {
     uint64_t base = (uint64_t)(uintptr_t)j_arena_base();
     uint64_t used = (uint64_t)j_arena_used();
     uint64_t nstat = (uint64_t)g_savestate_statics_count;
+    uint64_t anchor = ss_anchor();
     void *intern = *j_intern_head_slot();
 
     int ok = 1;
@@ -84,6 +92,7 @@ int savestate_save(const char *path) {
     ok &= fwrite(&base,  8, 1, f) == 1;
     ok &= fwrite(&used,  8, 1, f) == 1;
     ok &= fwrite(&nstat, 8, 1, f) == 1;
+    ok &= fwrite(&anchor, 8, 1, f) == 1;
     ok &= fwrite(j_arena_base(), 1, (size_t)used, f) == (size_t)used;
     ok &= fwrite(&intern, sizeof intern, 1, f) == 1;
     for (int i = 0; i < g_savestate_statics_count; i++)
@@ -97,15 +106,18 @@ int savestate_load(const char *path) {
     FILE *f = fopen(path, "rb");
     if (!f) return -1;
     uint32_t magic = 0, ver = 0;
-    uint64_t base = 0, used = 0, nstat = 0;
+    uint64_t base = 0, used = 0, nstat = 0, anchor = 0;
     if (fread(&magic, 4, 1, f) != 1 || magic != SS_MAGIC) { fclose(f); return -1; }
-    if (fread(&ver, 4, 1, f) != 1 || ver != SS_VERSION)   { fclose(f); return -1; }
+    if (fread(&ver, 4, 1, f) != 1 || ver != SS_VERSION)   { fclose(f); return -2; }
     if (fread(&base, 8, 1, f) != 1 || fread(&used, 8, 1, f) != 1 ||
-        fread(&nstat, 8, 1, f) != 1)                      { fclose(f); return -1; }
+        fread(&nstat, 8, 1, f) != 1 || fread(&anchor, 8, 1, f) != 1) { fclose(f); return -1; }
 
-    /* absolute pointers in the snapshot are only valid at the same arena base */
+    /* Reject snapshots whose pointers wouldn't be valid here, BEFORE touching any
+     * state -- otherwise we'd restore stale cls pointers and crash on first use.
+     * Same arena base + same exe anchor => same build at the same load address. */
     if (base != (uint64_t)(uintptr_t)j_arena_base())      { fclose(f); return -2; }
-    if (nstat != (uint64_t)g_savestate_statics_count)     { fclose(f); return -1; }
+    if (anchor != ss_anchor())                            { fclose(f); return -2; }
+    if (nstat != (uint64_t)g_savestate_statics_count)     { fclose(f); return -2; }
 
     int ok = 1;
     ok &= fread(j_arena_base(), 1, (size_t)used, f) == (size_t)used;

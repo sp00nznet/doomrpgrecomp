@@ -67,7 +67,7 @@ extern "C" void devgui_run_pending(void) {
         case P_SS_SAVE: slot_path(p, sizeof p, arg);
                         set_msg(savestate_save(p) == 0 ? "state saved" : "save failed"); break;
         case P_SS_LOAD: { slot_path(p, sizeof p, arg); int r = savestate_load(p);
-                        set_msg(r == 0 ? "state loaded" : r == -2 ? "from another session" : "load failed"); } break;
+                        set_msg(r == 0 ? "state loaded" : r == -2 ? "incompatible save (different build)" : "load failed"); } break;
         case P_RMS_BACKUP: { int r = devsaves_backup(arg);
                         snprintf(g_msg, sizeof g_msg, r > 0 ? "backed up %d files to slot %d"
                                  : "no game save to back up", r, arg); } break;
