@@ -23,7 +23,8 @@
       "name": "Doom II RPG SE",
       "screenW": 240,
       "screenH": 320,
-      "exe": "DoomIIRPG-SE"
+      "exe": "DoomIIRPG-SE",
+      "profile": "DoomIIRPG"
     },
     "WolfRPG": {
       "jar": "game/wolfenstein_rpg_240x320.jar",
