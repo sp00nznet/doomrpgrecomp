@@ -22,6 +22,9 @@ const GameProfile g_profile = {
 
     .state       = &S_k__f__I,    /* state machine (8 = main menu) -- readout */
 
-    /* Not yet decoded for this game; the built-in 3-6-6-6 menu covers them. */
+    .ammo_array  = &S_b__b__aS,   /* short[] per-weapon ammo (idx 1 = 34->30 on fire) */
     .ammo_max    = 99,
+
+    /* armor not yet mapped (it was already 50 in every capture); the built-in
+     * 3-6-6-6 menu covers it meanwhile. */
 };

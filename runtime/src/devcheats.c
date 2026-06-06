@@ -77,8 +77,17 @@ static jref ammo_arr(void) {
     return g_profile.ammo_array ? *g_profile.ammo_array : (jref)0;
 }
 static int  ammo_n(void)            { jref a = ammo_arr(); return a ? j_arraylength(a) : 0; }
-static int  ammo_get(int i)         { jref a = ammo_arr(); return (a && i >= 0 && i < ammo_n()) ? *j_barr(a, i) : -1; }
-static void ammo_set(int i, int v)  { jref a = ammo_arr(); if (a && i >= 0 && i < ammo_n()) *j_barr(a, i) = (jbyte)v; }
+/* Ammo is a byte[] in some games (Doom RPG) and a short[] in others (Doom II
+ * RPG: S_b__b__aS) -- dispatch on the array's element type. */
+static int  ammo_get(int i) {
+    jref a = ammo_arr(); if (!a || i < 0 || i >= ammo_n()) return -1;
+    return ((ArrayObj *)a)->atype == J_AT_S ? *j_sarr(a, i) : *j_barr(a, i);
+}
+static void ammo_set(int i, int v) {
+    jref a = ammo_arr(); if (!a || i < 0 || i >= ammo_n()) return;
+    if (((ArrayObj *)a)->atype == J_AT_S) *j_sarr(a, i) = (jshort)v;
+    else                                  *j_barr(a, i) = (jbyte)v;
+}
 static int  ammo_cap(void)          { return g_profile.ammo_max ? g_profile.ammo_max : 99; }
 
 /* ---- built-in debug-counters flag (per-game; via profile) ----------------- */
